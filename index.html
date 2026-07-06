@@ -1,0 +1,1209 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>习概毛概高效刷题工具</title>
+  <style>
+    :root {
+      --paper: #f8f3e7;
+      --paper-strong: #fffaf0;
+      --ink: #23201b;
+      --muted: #756f64;
+      --line: #d8cdbb;
+      --red: #b61f2b;
+      --red-dark: #7e1420;
+      --teal: #176f73;
+      --teal-soft: #d8f0ee;
+      --gold: #a86d16;
+      --green: #276738;
+      --wrong: #a62922;
+      --shadow: 0 22px 55px rgba(67, 45, 17, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 14%, rgba(182, 31, 43, 0.12), transparent 30%),
+        linear-gradient(135deg, #f8f3e7 0%, #f4e7d2 45%, #e8f0ec 100%);
+      font-family: "Iowan Old Style", "Songti SC", "STSong", "Noto Serif CJK SC", Georgia, serif;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .shell {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 26px 0 34px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) auto;
+      gap: 18px;
+      align-items: end;
+      padding-bottom: 18px;
+      border-bottom: 2px solid rgba(35, 32, 27, 0.12);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 48px);
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+
+    .brand p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .stats-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(92px, 1fr));
+      gap: 8px;
+      min-width: min(520px, 100%);
+    }
+
+    .stat {
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      background: rgba(255, 250, 240, 0.72);
+      box-shadow: 0 10px 26px rgba(67, 45, 17, 0.08);
+    }
+
+    .stat span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .stat strong {
+      display: block;
+      margin-top: 3px;
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 330px;
+      gap: 18px;
+      margin-top: 20px;
+    }
+
+    .view-nav {
+      display: inline-flex;
+      gap: 8px;
+      margin-top: 16px;
+      padding: 5px;
+      border: 1px solid var(--line);
+      background: rgba(255, 250, 240, 0.72);
+      box-shadow: 0 12px 26px rgba(67, 45, 17, 0.08);
+    }
+
+    .view-tab {
+      min-height: 38px;
+      padding: 8px 16px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .view-tab.active {
+      border-color: var(--red);
+      background: var(--red);
+      color: #fff;
+    }
+
+    .app-view {
+      margin-top: 20px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      background: rgba(255, 250, 240, 0.82);
+      box-shadow: var(--shadow);
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .field select {
+      width: 100%;
+      min-height: 40px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 0;
+      color: var(--ink);
+      background: var(--paper-strong);
+    }
+
+    .toggle-line {
+      display: flex;
+      align-items: end;
+      gap: 8px;
+    }
+
+    .toggle-button,
+    .ghost-button,
+    .primary-button,
+    .danger-button {
+      min-height: 40px;
+      padding: 9px 13px;
+      border: 1px solid var(--line);
+      border-radius: 0;
+      color: var(--ink);
+      background: var(--paper-strong);
+      transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
+    }
+
+    .toggle-button.active,
+    .primary-button {
+      border-color: var(--red);
+      color: #fff;
+      background: var(--red);
+    }
+
+    .danger-button {
+      border-color: rgba(166, 41, 34, 0.45);
+      color: var(--wrong);
+    }
+
+    .ghost-button:hover,
+    .toggle-button:hover,
+    .primary-button:hover,
+    .danger-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 24px rgba(67, 45, 17, 0.14);
+    }
+
+    .question-area {
+      padding: 22px;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 5px 9px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      background: rgba(248, 243, 231, 0.7);
+      font-size: 13px;
+    }
+
+    .pill.subject {
+      border-color: rgba(182, 31, 43, 0.38);
+      color: var(--red-dark);
+      background: rgba(182, 31, 43, 0.08);
+      font-weight: 700;
+    }
+
+    .pill.type-badge {
+      min-height: 42px;
+      padding: 7px 14px;
+      border: 2px solid var(--teal);
+      color: #fff;
+      background: var(--teal);
+      font-size: 20px;
+      font-weight: 900;
+      line-height: 1;
+      box-shadow: 0 10px 22px rgba(23, 111, 115, 0.18);
+    }
+
+    .question-text {
+      margin: 0 0 18px;
+      font-size: clamp(21px, 2.3vw, 30px);
+      line-height: 1.45;
+      letter-spacing: 0;
+    }
+
+    .options {
+      display: grid;
+      gap: 10px;
+    }
+
+    .option {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+      width: 100%;
+      min-height: 58px;
+      padding: 10px 14px 10px 10px;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      text-align: left;
+      background: rgba(255, 250, 240, 0.88);
+      transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+    }
+
+    .option:hover {
+      border-color: rgba(23, 111, 115, 0.5);
+      transform: translateX(2px);
+    }
+
+    .option.selected {
+      border-color: var(--teal);
+      background: var(--teal-soft);
+    }
+
+    .option.correct {
+      border-color: var(--green);
+      background: rgba(39, 103, 56, 0.13);
+    }
+
+    .option.wrong {
+      border-color: var(--wrong);
+      background: rgba(166, 41, 34, 0.12);
+    }
+
+    .option[disabled] {
+      cursor: default;
+      transform: none;
+    }
+
+    .option-key {
+      display: inline-grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border: 1px solid rgba(35, 32, 27, 0.18);
+      background: #fffaf0;
+      font-weight: 800;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-top: 18px;
+    }
+
+    .feedback {
+      min-height: 34px;
+      margin-top: 14px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .feedback.good {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .feedback.bad {
+      color: var(--wrong);
+      font-weight: 700;
+    }
+
+    .side {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .side-section {
+      padding: 14px;
+      border: 1px solid var(--line);
+      background: rgba(255, 250, 240, 0.82);
+      box-shadow: 0 16px 34px rgba(67, 45, 17, 0.11);
+    }
+
+    .side-section h2 {
+      margin: 0 0 10px;
+      font-size: 18px;
+      line-height: 1.2;
+    }
+
+    .meter {
+      height: 12px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: rgba(35, 32, 27, 0.08);
+    }
+
+    .meter > div {
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, var(--red), var(--teal));
+      transition: width 200ms ease;
+    }
+
+    .wrong-book-view {
+      border: 1px solid var(--line);
+      background: rgba(255, 250, 240, 0.82);
+      box-shadow: var(--shadow);
+    }
+
+    .wrong-book-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: end;
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .wrong-book-header h2 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.1;
+    }
+
+    .wrong-book-header p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .wrong-filters {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(150px, 1fr));
+      gap: 10px;
+      min-width: min(360px, 100%);
+    }
+
+    .wrong-book-list {
+      display: grid;
+      gap: 10px;
+      padding: 16px;
+    }
+
+    .wrong-item {
+      display: grid;
+      gap: 6px;
+      padding: 12px;
+      border: 1px solid rgba(216, 205, 187, 0.9);
+      background: rgba(248, 243, 231, 0.7);
+    }
+
+    .wrong-item p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .wrong-item button {
+      justify-self: start;
+      min-height: 30px;
+      padding: 5px 9px;
+      border: 1px solid var(--line);
+      background: #fffaf0;
+      color: var(--ink);
+    }
+
+    .wrong-item-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .storage-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .empty {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 900px) {
+      .topbar,
+      .wrong-book-header,
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .stats-strip,
+      .toolbar,
+      .wrong-filters {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 560px) {
+      .shell {
+        width: min(100% - 20px, 1180px);
+        padding-top: 14px;
+      }
+
+      .stats-strip,
+      .toolbar,
+      .wrong-filters,
+      .storage-row {
+        grid-template-columns: 1fr;
+      }
+
+      .question-area {
+        padding: 16px;
+      }
+
+      .option {
+        grid-template-columns: 36px minmax(0, 1fr);
+        padding-right: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <h1>习概毛概刷题</h1>
+        <p>错题加权随机，所有题保留基础出现机会。</p>
+      </div>
+      <section class="stats-strip" aria-label="刷题统计">
+        <div class="stat"><span>今日</span><strong id="today-count">0</strong></div>
+        <div class="stat"><span>总正确率</span><strong id="accuracy">0%</strong></div>
+        <div class="stat"><span>错题</span><strong id="wrong-total">0</strong></div>
+        <div class="stat"><span>题库</span><strong id="bank-total">458</strong></div>
+      </section>
+    </header>
+
+    <nav class="view-nav" aria-label="视图切换">
+      <button class="view-tab active" data-view="practice" type="button">刷题</button>
+      <button class="view-tab" data-view="wrongBook" type="button">错题本</button>
+    </nav>
+
+    <section class="layout app-view" id="practice-view">
+      <section class="panel" aria-label="刷题区">
+        <div class="toolbar">
+          <div class="field">
+            <label for="subject-filter">科目</label>
+            <select id="subject-filter">
+              <option value="all">全部</option>
+              <option value="X">习概</option>
+              <option value="M">毛概</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="type-filter">题型</label>
+            <select id="type-filter">
+              <option value="all">全部</option>
+              <option value="single">单选</option>
+              <option value="multiple">多选</option>
+              <option value="truefalse">判断</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="scope-filter">范围</label>
+            <select id="scope-filter">
+              <option value="all">全题库加权</option>
+              <option value="wrong">只刷错题</option>
+              <option value="favorite">只刷收藏</option>
+            </select>
+          </div>
+          <div class="toggle-line">
+            <button class="toggle-button" id="favorite-current" type="button">收藏本题</button>
+          </div>
+        </div>
+
+        <div class="question-area">
+          <div class="meta-row" id="meta-row"></div>
+          <h2 class="question-text" id="question-text"></h2>
+          <div class="options" id="options"></div>
+          <div class="actions">
+            <button class="primary-button" id="submit-answer" type="button">提交</button>
+            <button class="ghost-button" id="previous-question" type="button">上一题</button>
+            <button class="ghost-button" id="skip-question" type="button">跳过</button>
+            <button class="ghost-button" id="mark-mastered" type="button">标记掌握</button>
+          </div>
+          <div class="feedback" id="feedback"></div>
+        </div>
+      </section>
+
+      <aside class="side" aria-label="刷题数据">
+        <section class="side-section">
+          <h2>当前题</h2>
+          <p class="empty" id="current-stats">尚未选择题目。</p>
+          <div class="meter" aria-hidden="true"><div id="current-weight-bar"></div></div>
+        </section>
+
+        <section class="side-section">
+          <h2>进度</h2>
+          <div class="storage-row">
+            <button class="ghost-button" id="export-progress" type="button">导出</button>
+            <button class="ghost-button" id="import-progress-button" type="button">导入</button>
+            <button class="danger-button" id="reset-progress" type="button">重置</button>
+            <input class="hidden" id="import-progress" type="file" accept="application/json">
+          </div>
+        </section>
+      </aside>
+    </section>
+
+    <section class="app-view wrong-book-view hidden" id="wrong-book-view" aria-label="错题本">
+      <header class="wrong-book-header">
+        <div>
+          <h2>错题本</h2>
+          <p id="wrong-book-summary">还没有错题。</p>
+        </div>
+        <div class="wrong-filters">
+          <div class="field">
+            <label for="wrong-subject-filter">科目</label>
+            <select id="wrong-subject-filter">
+              <option value="all">全部</option>
+              <option value="X">习概</option>
+              <option value="M">毛概</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="wrong-type-filter">题型</label>
+            <select id="wrong-type-filter">
+              <option value="all">全部</option>
+              <option value="single">单选</option>
+              <option value="multiple">多选</option>
+              <option value="truefalse">判断</option>
+            </select>
+          </div>
+        </div>
+      </header>
+      <div class="wrong-book-list" id="wrong-book-list"></div>
+    </section>
+  </main>
+
+  <script src="question_bank_combined_en_schema.js"></script>
+  <script>
+
+const Core = (() => {
+const DEFAULT_STATS = Object.freeze({
+  seenCount: 0,
+  correctCount: 0,
+  wrongCount: 0,
+  streak: 0,
+  mastered: false,
+  favorite: false,
+  lastAnsweredAt: null,
+});
+
+function getSubjectLabel(category) {
+  if (category === 'X') return '习概';
+  if (category === 'M') return '毛概';
+  return '未分类';
+}
+
+function getQuestionType(question) {
+  const answers = question.correct_answer || [];
+  const options = question.options || {};
+  const values = Object.values(options).map((value) => String(value).toLowerCase());
+
+  if (
+    Object.keys(options).length === 2 &&
+    values.includes('true') &&
+    values.includes('false')
+  ) {
+    return 'truefalse';
+  }
+
+  return answers.length > 1 ? 'multiple' : 'single';
+}
+
+function getQuestionTypeLabel(type) {
+  if (type === 'multiple') return '多选';
+  if (type === 'truefalse') return '判断';
+  return '单选';
+}
+
+function normalizeAnswer(answer) {
+  return [...new Set(answer)].sort();
+}
+
+function isCorrectAnswer(selected, correct) {
+  const normalizedSelected = normalizeAnswer(selected);
+  const normalizedCorrect = normalizeAnswer(correct);
+
+  if (normalizedSelected.length !== normalizedCorrect.length) return false;
+  return normalizedSelected.every((item, index) => item === normalizedCorrect[index]);
+}
+
+function canSubmitAnswer(question, selected) {
+  const normalizedSelected = normalizeAnswer(selected);
+  if (normalizedSelected.length === 0) {
+    return { ok: false, message: '先选择答案。' };
+  }
+
+  if (getQuestionType(question) === 'multiple' && normalizedSelected.length < 2) {
+    return { ok: false, message: '多选题至少选择两个选项。' };
+  }
+
+  return { ok: true, message: '' };
+}
+
+function getQuestionStats(progress, questionId) {
+  return {
+    ...DEFAULT_STATS,
+    ...(progress[String(questionId)] || {}),
+  };
+}
+
+function getQuestionWeight(stats) {
+  const baseWeight = 1 + Math.min(stats.wrongCount || 0, 5) * 2;
+
+  if (stats.mastered) {
+    return Math.max(1, Math.floor(baseWeight / 4));
+  }
+
+  return baseWeight;
+}
+
+function buildWeightedPool(questions, progress) {
+  const pool = [];
+
+  for (const question of questions) {
+    const stats = getQuestionStats(progress, question.id);
+    const weight = getQuestionWeight(stats);
+    for (let index = 0; index < weight; index += 1) {
+      pool.push(question.id);
+    }
+  }
+
+  return pool;
+}
+
+function pickWeightedQuestion(questions, progress, random = Math.random) {
+  if (!questions.length) return null;
+
+  const pool = buildWeightedPool(questions, progress);
+  const pickedId = pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))];
+
+  return questions.find((question) => question.id === pickedId) || questions[0];
+}
+
+function rememberQuestion(history, currentId, nextId, maxLength = 100) {
+  if (currentId === null || currentId === undefined || currentId === nextId) {
+    return history;
+  }
+
+  return [...history, currentId].slice(-maxLength);
+}
+
+function takePreviousQuestion(questions, history) {
+  if (!history.length) {
+    return { question: null, history: [] };
+  }
+
+  const nextHistory = history.slice(0, -1);
+  const previousId = history[history.length - 1];
+  const question = questions.find((item) => item.id === previousId) || null;
+
+  return { question, history: nextHistory };
+}
+
+function updateProgressAfterAnswer(progress, questionId, wasCorrect, now = new Date()) {
+  const id = String(questionId);
+  const previous = getQuestionStats(progress, id);
+  const next = {
+    ...previous,
+    seenCount: previous.seenCount + 1,
+    correctCount: previous.correctCount + (wasCorrect ? 1 : 0),
+    wrongCount: previous.wrongCount + (wasCorrect ? 0 : 1),
+    streak: wasCorrect ? previous.streak + 1 : 0,
+    lastAnsweredAt: now.toISOString(),
+  };
+
+  next.mastered = next.wrongCount > 0 && next.streak >= 2;
+
+  return {
+    ...progress,
+    [id]: next,
+  };
+}
+
+  return {
+    getSubjectLabel,
+    getQuestionType,
+    getQuestionTypeLabel,
+    normalizeAnswer,
+    isCorrectAnswer,
+    canSubmitAnswer,
+    getQuestionStats,
+    getQuestionWeight,
+    buildWeightedPool,
+    pickWeightedQuestion,
+    rememberQuestion,
+    takePreviousQuestion,
+    updateProgressAfterAnswer,
+  };
+})();
+
+
+const STORAGE_KEY = 'xi-mao-review-progress-v1';
+const TODAY_KEY = 'xi-mao-review-today-v1';
+const questions = (window.QUESTION_BANK || []).map((question, index) => ({
+  ...question,
+  id: index,
+}));
+
+const state = {
+  progress: loadProgress(),
+  today: loadToday(),
+  current: null,
+  history: [],
+  selected: new Set(),
+  answered: false,
+};
+
+const elements = {
+  viewButtons: document.querySelectorAll('[data-view]'),
+  practiceView: document.getElementById('practice-view'),
+  wrongBookView: document.getElementById('wrong-book-view'),
+  subjectFilter: document.getElementById('subject-filter'),
+  typeFilter: document.getElementById('type-filter'),
+  scopeFilter: document.getElementById('scope-filter'),
+  wrongSubjectFilter: document.getElementById('wrong-subject-filter'),
+  wrongTypeFilter: document.getElementById('wrong-type-filter'),
+  wrongBookSummary: document.getElementById('wrong-book-summary'),
+  wrongBookList: document.getElementById('wrong-book-list'),
+  favoriteCurrent: document.getElementById('favorite-current'),
+  metaRow: document.getElementById('meta-row'),
+  questionText: document.getElementById('question-text'),
+  options: document.getElementById('options'),
+  submitAnswer: document.getElementById('submit-answer'),
+  previousQuestion: document.getElementById('previous-question'),
+  skipQuestion: document.getElementById('skip-question'),
+  markMastered: document.getElementById('mark-mastered'),
+  feedback: document.getElementById('feedback'),
+  currentStats: document.getElementById('current-stats'),
+  currentWeightBar: document.getElementById('current-weight-bar'),
+  todayCount: document.getElementById('today-count'),
+  accuracy: document.getElementById('accuracy'),
+  wrongTotal: document.getElementById('wrong-total'),
+  bankTotal: document.getElementById('bank-total'),
+  exportProgress: document.getElementById('export-progress'),
+  importProgressButton: document.getElementById('import-progress-button'),
+  importProgress: document.getElementById('import-progress'),
+  resetProgress: document.getElementById('reset-progress'),
+};
+
+function loadProgress() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveProgress() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
+}
+
+function loadToday() {
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    const data = JSON.parse(localStorage.getItem(TODAY_KEY)) || {};
+    return data.date === today ? data : { date: today, count: 0 };
+  } catch {
+    return { date: today, count: 0 };
+  }
+}
+
+function saveToday() {
+  localStorage.setItem(TODAY_KEY, JSON.stringify(state.today));
+}
+
+function switchView(view) {
+  const isWrongBook = view === 'wrongBook';
+  elements.practiceView.classList.toggle('hidden', isWrongBook);
+  elements.wrongBookView.classList.toggle('hidden', !isWrongBook);
+  elements.viewButtons.forEach((button) => {
+    button.classList.toggle('active', button.dataset.view === view);
+  });
+  if (isWrongBook) renderWrongBook();
+}
+
+function getFilteredQuestions() {
+  const subject = elements.subjectFilter.value;
+  const type = elements.typeFilter.value;
+  const scope = elements.scopeFilter.value;
+
+  return questions.filter((question) => {
+    const stats = Core.getQuestionStats(state.progress, question.id);
+    const questionType = Core.getQuestionType(question);
+    if (subject !== 'all' && question.category !== subject) return false;
+    if (type !== 'all' && questionType !== type) return false;
+    if (scope === 'wrong' && stats.wrongCount === 0) return false;
+    if (scope === 'favorite' && !stats.favorite) return false;
+    return true;
+  });
+}
+
+function chooseNextQuestion() {
+  const candidates = getFilteredQuestions();
+  if (!candidates.length) {
+    state.current = null;
+    renderEmptyState();
+    return;
+  }
+
+  const usable = candidates.length > 1 && state.current
+    ? candidates.filter((question) => question.id !== state.current.id)
+    : candidates;
+  const previousId = state.current ? state.current.id : null;
+  const nextQuestion = Core.pickWeightedQuestion(usable, state.progress);
+  state.history = Core.rememberQuestion(state.history, previousId, nextQuestion.id);
+  state.current = nextQuestion;
+  state.selected = new Set();
+  state.answered = false;
+  renderQuestion();
+}
+
+function showPreviousQuestion() {
+  const restored = Core.takePreviousQuestion(questions, state.history);
+  if (!restored.question) {
+    elements.feedback.textContent = '没有上一题。';
+    elements.feedback.className = 'feedback bad';
+    return;
+  }
+
+  state.history = restored.history;
+  state.current = restored.question;
+  state.selected = new Set();
+  state.answered = false;
+  renderQuestion();
+}
+
+function renderEmptyState() {
+  elements.metaRow.innerHTML = '<span class="pill">当前筛选下没有题目</span>';
+  elements.questionText.textContent = '请调整科目、题型或范围。';
+  elements.options.innerHTML = '';
+  elements.feedback.textContent = '';
+  elements.feedback.className = 'feedback';
+  elements.currentStats.textContent = '当前筛选下没有可刷题目。';
+  elements.currentWeightBar.style.width = '0%';
+  elements.submitAnswer.disabled = true;
+  elements.submitAnswer.textContent = '提交';
+  elements.previousQuestion.disabled = state.history.length === 0;
+  elements.favoriteCurrent.disabled = true;
+  elements.markMastered.disabled = true;
+  renderGlobalStats();
+  renderWrongBook();
+}
+
+function renderQuestion() {
+  const question = state.current;
+  const stats = Core.getQuestionStats(state.progress, question.id);
+  const type = Core.getQuestionType(question);
+  const weight = Core.getQuestionWeight(stats);
+  const correctText = Core.normalizeAnswer(question.correct_answer).join('、');
+
+  elements.submitAnswer.disabled = false;
+  elements.submitAnswer.textContent = '提交';
+  elements.previousQuestion.disabled = state.history.length === 0;
+  elements.favoriteCurrent.disabled = false;
+  elements.markMastered.disabled = false;
+  elements.favoriteCurrent.classList.toggle('active', stats.favorite);
+  elements.favoriteCurrent.textContent = stats.favorite ? '已收藏' : '收藏本题';
+  elements.markMastered.textContent = stats.mastered ? '取消掌握' : '标记掌握';
+  elements.metaRow.innerHTML = [
+    `<span class="pill subject">${Core.getSubjectLabel(question.category)}</span>`,
+    `<span class="pill type-badge">${Core.getQuestionTypeLabel(type)}</span>`,
+    `<span class="pill">错误 ${stats.wrongCount} 次</span>`,
+    `<span class="pill">权重 ${weight}</span>`,
+    `<span class="pill">答案 ${correctText}</span>`,
+  ].join('');
+  elements.questionText.textContent = question.question;
+  elements.options.innerHTML = '';
+
+  Object.entries(question.options).forEach(([key, value]) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'option';
+    button.dataset.key = key;
+    button.innerHTML = `<span class="option-key">${key}</span><span>${value}</span>`;
+    button.addEventListener('click', () => toggleOption(key));
+    elements.options.appendChild(button);
+  });
+
+  elements.feedback.textContent = type === 'multiple' ? '多选题需要选全，少选或多选都算错。' : '';
+  elements.feedback.className = 'feedback';
+  renderCurrentStats();
+  renderGlobalStats();
+  renderWrongBook();
+}
+
+function toggleOption(key) {
+  if (!state.current || state.answered) return;
+  const type = Core.getQuestionType(state.current);
+
+  if (type === 'multiple') {
+    if (state.selected.has(key)) state.selected.delete(key);
+    else state.selected.add(key);
+  } else {
+    state.selected = new Set([key]);
+  }
+
+  [...elements.options.children].forEach((button) => {
+    button.classList.toggle('selected', state.selected.has(button.dataset.key));
+  });
+}
+
+function submitAnswer() {
+  if (!state.current) return;
+  if (state.answered) {
+    chooseNextQuestion();
+    return;
+  }
+
+  const validation = Core.canSubmitAnswer(state.current, [...state.selected]);
+  if (!validation.ok) {
+    elements.feedback.textContent = validation.message;
+    elements.feedback.className = 'feedback bad';
+    return;
+  }
+
+  const selected = [...state.selected];
+  const wasCorrect = Core.isCorrectAnswer(selected, state.current.correct_answer);
+  state.progress = Core.updateProgressAfterAnswer(state.progress, state.current.id, wasCorrect);
+  state.today.count += 1;
+  state.answered = true;
+  saveProgress();
+  saveToday();
+
+  [...elements.options.children].forEach((button) => {
+    const key = button.dataset.key;
+    button.disabled = true;
+    if (state.current.correct_answer.includes(key)) button.classList.add('correct');
+    if (state.selected.has(key) && !state.current.correct_answer.includes(key)) button.classList.add('wrong');
+  });
+
+  const correctText = Core.normalizeAnswer(state.current.correct_answer).join('、');
+  if (wasCorrect) {
+    elements.feedback.textContent = `正确。标准答案：${correctText}。`;
+    elements.feedback.className = 'feedback good';
+  } else {
+    elements.feedback.textContent = `错误。标准答案：${correctText}。`;
+    elements.feedback.className = 'feedback bad';
+  }
+
+  elements.submitAnswer.textContent = '下一题';
+  renderCurrentStats();
+  renderGlobalStats();
+  renderWrongBook();
+}
+
+function renderCurrentStats() {
+  if (!state.current) return;
+  const stats = Core.getQuestionStats(state.progress, state.current.id);
+  const weight = Core.getQuestionWeight(stats);
+  elements.currentStats.textContent = `已做 ${stats.seenCount} 次，答错 ${stats.wrongCount} 次，连续答对 ${stats.streak} 次。`;
+  elements.currentWeightBar.style.width = `${Math.min(100, Math.round((weight / 11) * 100))}%`;
+}
+
+function renderGlobalStats() {
+  let seen = 0;
+  let correct = 0;
+  let wrongQuestions = 0;
+
+  for (const question of questions) {
+    const stats = Core.getQuestionStats(state.progress, question.id);
+    seen += stats.seenCount;
+    correct += stats.correctCount;
+    if (stats.wrongCount > 0) wrongQuestions += 1;
+  }
+
+  elements.todayCount.textContent = String(state.today.count);
+  elements.accuracy.textContent = seen ? `${Math.round((correct / seen) * 100)}%` : '0%';
+  elements.wrongTotal.textContent = String(wrongQuestions);
+  elements.bankTotal.textContent = String(questions.length);
+}
+
+function renderWrongBook() {
+  const subject = elements.wrongSubjectFilter.value;
+  const type = elements.wrongTypeFilter.value;
+  const allWrongItems = questions
+    .map((question) => ({ question, stats: Core.getQuestionStats(state.progress, question.id) }))
+    .filter((item) => item.stats.wrongCount > 0)
+    .sort((a, b) => b.stats.wrongCount - a.stats.wrongCount || a.question.id - b.question.id);
+
+  const wrongItems = allWrongItems.filter((item) => {
+    if (subject !== 'all' && item.question.category !== subject) return false;
+    if (type !== 'all' && Core.getQuestionType(item.question) !== type) return false;
+    return true;
+  });
+
+  elements.wrongBookSummary.textContent = allWrongItems.length
+    ? `共 ${allWrongItems.length} 道错题，当前筛选显示 ${wrongItems.length} 道。`
+    : '还没有错题。';
+
+  if (!wrongItems.length) {
+    elements.wrongBookList.innerHTML = '<p class="empty">当前筛选下没有错题。</p>';
+    return;
+  }
+
+  elements.wrongBookList.innerHTML = '';
+  wrongItems.forEach((item) => {
+    const row = document.createElement('div');
+    row.className = 'wrong-item';
+    const questionType = Core.getQuestionType(item.question);
+    row.innerHTML = `
+      <div class="wrong-item-meta">
+        <span class="pill subject">${Core.getSubjectLabel(item.question.category)}</span>
+        <span class="pill type-badge">${Core.getQuestionTypeLabel(questionType)}</span>
+        <span class="pill">错误 ${item.stats.wrongCount} 次</span>
+        <span class="pill">连续答对 ${item.stats.streak} 次</span>
+        <span class="pill">${item.stats.mastered ? '已掌握' : '未掌握'}</span>
+      </div>
+      <p>${item.question.question}</p>
+      <button type="button">练这题</button>
+    `;
+    row.querySelector('button').addEventListener('click', () => {
+      state.history = Core.rememberQuestion(
+        state.history,
+        state.current ? state.current.id : null,
+        item.question.id
+      );
+      state.current = item.question;
+      state.selected = new Set();
+      state.answered = false;
+      switchView('practice');
+      renderQuestion();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    elements.wrongBookList.appendChild(row);
+  });
+}
+
+function toggleFavorite() {
+  if (!state.current) return;
+  const id = String(state.current.id);
+  const stats = Core.getQuestionStats(state.progress, id);
+  state.progress = {
+    ...state.progress,
+    [id]: {
+      ...stats,
+      favorite: !stats.favorite,
+    },
+  };
+  saveProgress();
+  renderQuestion();
+}
+
+function toggleMastered() {
+  if (!state.current) return;
+  const id = String(state.current.id);
+  const stats = Core.getQuestionStats(state.progress, id);
+  state.progress = {
+    ...state.progress,
+    [id]: {
+      ...stats,
+      mastered: !stats.mastered,
+      streak: stats.mastered ? stats.streak : Math.max(stats.streak, 2),
+    },
+  };
+  saveProgress();
+  renderQuestion();
+}
+
+function exportProgress() {
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    progress: state.progress,
+    today: state.today,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'xi-mao-review-progress.json';
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function importProgress(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const payload = JSON.parse(reader.result);
+      state.progress = payload.progress && typeof payload.progress === 'object' ? payload.progress : payload;
+      saveProgress();
+      chooseNextQuestion();
+    } catch {
+      elements.feedback.textContent = '导入失败，文件不是有效的进度 JSON。';
+      elements.feedback.className = 'feedback bad';
+    }
+  };
+  reader.readAsText(file);
+}
+
+function resetProgress() {
+  if (!confirm('确定清空所有刷题记录和错题本吗？')) return;
+  state.progress = {};
+  state.today = { date: new Date().toISOString().slice(0, 10), count: 0 };
+  state.history = [];
+  saveProgress();
+  saveToday();
+  chooseNextQuestion();
+}
+
+elements.subjectFilter.addEventListener('change', chooseNextQuestion);
+elements.typeFilter.addEventListener('change', chooseNextQuestion);
+elements.scopeFilter.addEventListener('change', chooseNextQuestion);
+elements.wrongSubjectFilter.addEventListener('change', renderWrongBook);
+elements.wrongTypeFilter.addEventListener('change', renderWrongBook);
+elements.viewButtons.forEach((button) => {
+  button.addEventListener('click', () => switchView(button.dataset.view));
+});
+elements.submitAnswer.addEventListener('click', submitAnswer);
+elements.previousQuestion.addEventListener('click', showPreviousQuestion);
+elements.skipQuestion.addEventListener('click', chooseNextQuestion);
+elements.favoriteCurrent.addEventListener('click', toggleFavorite);
+elements.markMastered.addEventListener('click', toggleMastered);
+elements.exportProgress.addEventListener('click', exportProgress);
+elements.importProgressButton.addEventListener('click', () => elements.importProgress.click());
+elements.importProgress.addEventListener('change', (event) => {
+  const [file] = event.target.files;
+  if (file) importProgress(file);
+  event.target.value = '';
+});
+elements.resetProgress.addEventListener('click', resetProgress);
+
+chooseNextQuestion();
+  </script>
+</body>
+</html>
