@@ -930,7 +930,6 @@ function renderQuestion() {
   const stats = Core.getQuestionStats(state.progress, question.id);
   const type = Core.getQuestionType(question);
   const weight = Core.getQuestionWeight(stats);
-  const correctText = Core.normalizeAnswer(question.correct_answer).join('、');
 
   elements.submitAnswer.disabled = false;
   elements.submitAnswer.textContent = '提交';
@@ -945,7 +944,6 @@ function renderQuestion() {
     `<span class="pill type-badge">${Core.getQuestionTypeLabel(type)}</span>`,
     `<span class="pill">错误 ${stats.wrongCount} 次</span>`,
     `<span class="pill">权重 ${weight}</span>`,
-    `<span class="pill">答案 ${correctText}</span>`,
   ].join('');
   elements.questionText.textContent = question.question;
   elements.options.innerHTML = '';

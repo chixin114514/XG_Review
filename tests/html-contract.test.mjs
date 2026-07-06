@@ -31,3 +31,8 @@ test('question bank is loaded from sibling files instead of embedded in index', 
   assert.equal(existsSync(new URL('../question_bank_combined_en_schema.json', import.meta.url)), true);
   assert.equal(existsSync(new URL('../question_bank_combined_en_schema.js', import.meta.url)), true);
 });
+
+test('question metadata does not reveal the correct answer before submission', () => {
+  assert.doesNotMatch(html, /<span class="pill">答案 \$\{correctText\}<\/span>/);
+  assert.doesNotMatch(html, /<span class="pill">答案 \$\{\{correctText\}\}<\/span>/);
+});
