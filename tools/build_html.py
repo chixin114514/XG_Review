@@ -825,26 +825,14 @@ function renderEmptyState() {{
 
 function renderQuestion() {{
   const question = state.current;
-  const stats = Core.getQuestionStats(state.progress, question.id);
   const type = Core.getQuestionType(question);
-  const weight = Core.getQuestionWeight(stats);
 
   elements.submitAnswer.disabled = false;
-  elements.submitAnswer.textContent = '提交';
-  elements.previousQuestion.disabled = state.history.length === 0;
   elements.favoriteCurrent.disabled = false;
   elements.markMastered.disabled = false;
-  elements.favoriteCurrent.classList.toggle('active', stats.favorite);
-  elements.favoriteCurrent.textContent = stats.favorite ? '已收藏' : '收藏本题';
-  elements.markMastered.textContent = stats.mastered ? '取消掌握' : '标记掌握';
-  elements.metaRow.innerHTML = [
-    `<span class="pill subject">${{Core.getSubjectLabel(question.category)}}</span>`,
-    `<span class="pill type-badge">${{Core.getQuestionTypeLabel(type)}}</span>`,
-    `<span class="pill">错误 ${{stats.wrongCount}} 次</span>`,
-    `<span class="pill">权重 ${{weight}}</span>`,
-  ].join('');
   elements.questionText.textContent = question.question;
   elements.options.innerHTML = '';
+  renderQuestionMeta();
 
   Object.entries(question.options).forEach(([key, value]) => {{
     const button = document.createElement('button');
@@ -861,6 +849,26 @@ function renderQuestion() {{
   renderCurrentStats();
   renderGlobalStats();
   renderWrongBook();
+}}
+
+function renderQuestionMeta() {{
+  if (!state.current) return;
+  const question = state.current;
+  const stats = Core.getQuestionStats(state.progress, question.id);
+  const type = Core.getQuestionType(question);
+  const weight = Core.getQuestionWeight(stats);
+
+  elements.submitAnswer.textContent = state.answered ? '下一题' : '提交';
+  elements.previousQuestion.disabled = state.history.length === 0;
+  elements.favoriteCurrent.classList.toggle('active', stats.favorite);
+  elements.favoriteCurrent.textContent = stats.favorite ? '已收藏' : '收藏本题';
+  elements.markMastered.textContent = stats.mastered ? '取消掌握' : '标记掌握';
+  elements.metaRow.innerHTML = [
+    `<span class="pill subject">${{Core.getSubjectLabel(question.category)}}</span>`,
+    `<span class="pill type-badge">${{Core.getQuestionTypeLabel(type)}}</span>`,
+    `<span class="pill">错误 ${{stats.wrongCount}} 次</span>`,
+    `<span class="pill">权重 ${{weight}}</span>`,
+  ].join('');
 }}
 
 function toggleOption(key) {{
@@ -917,7 +925,7 @@ function submitAnswer() {{
     elements.feedback.className = 'feedback bad';
   }}
 
-  elements.submitAnswer.textContent = '下一题';
+  renderQuestionMeta();
   renderCurrentStats();
   renderGlobalStats();
   renderWrongBook();
@@ -1017,7 +1025,9 @@ function toggleFavorite() {{
     }},
   }};
   saveProgress();
-  renderQuestion();
+  renderQuestionMeta();
+  renderGlobalStats();
+  renderWrongBook();
 }}
 
 function toggleMastered() {{
@@ -1033,7 +1043,10 @@ function toggleMastered() {{
     }},
   }};
   saveProgress();
-  renderQuestion();
+  renderQuestionMeta();
+  renderCurrentStats();
+  renderGlobalStats();
+  renderWrongBook();
 }}
 
 function exportProgress() {{

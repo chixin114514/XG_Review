@@ -7,7 +7,8 @@ const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 test('submit button turns into the next question action after submission', () => {
   assert.doesNotMatch(html, /id="next-question"/);
   assert.match(html, /elements\.submitAnswer\.textContent = '提交';/);
-  assert.match(html, /elements\.submitAnswer\.textContent = '下一题';/);
+  assert.match(html, /elements\.submitAnswer\.textContent = state\.answered \? '下一题' : '提交';/);
+  assert.match(html, /state\.answered = true;[\s\S]*?renderQuestionMeta\(\);/);
   assert.match(html, /if \(state\.answered\) \{\s+chooseNextQuestion\(\);\s+return;\s+\}/);
 });
 
@@ -35,4 +36,15 @@ test('question bank is loaded from sibling files instead of embedded in index', 
 test('question metadata does not reveal the correct answer before submission', () => {
   assert.doesNotMatch(html, /<span class="pill">答案 \$\{correctText\}<\/span>/);
   assert.doesNotMatch(html, /<span class="pill">答案 \$\{\{correctText\}\}<\/span>/);
+});
+
+test('favorite and mastered toggles do not reset submitted question state', () => {
+  const favoriteBody = html.match(/function toggleFavorite\(\) \{([\s\S]*?)\n\}/)?.[1] || '';
+  const masteredBody = html.match(/function toggleMastered\(\) \{([\s\S]*?)\n\}/)?.[1] || '';
+
+  assert.match(html, /elements\.submitAnswer\.textContent = state\.answered \? '下一题' : '提交';/);
+  assert.doesNotMatch(favoriteBody, /renderQuestion\(\)/);
+  assert.doesNotMatch(masteredBody, /renderQuestion\(\)/);
+  assert.match(favoriteBody, /renderQuestionMeta\(\)/);
+  assert.match(masteredBody, /renderQuestionMeta\(\)/);
 });
