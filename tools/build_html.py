@@ -569,6 +569,7 @@ def build_html() -> str:
     <nav class="view-nav" aria-label="视图切换">
       <button class="view-tab active" data-view="practice" type="button">刷题</button>
       <button class="view-tab" data-view="wrongBook" type="button">错题本</button>
+      <button class="view-tab" data-view="favorite" type="button">收藏</button>
     </nav>
 
     <section class="layout app-view" id="practice-view">
@@ -665,6 +666,35 @@ def build_html() -> str:
       </header>
       <div class="wrong-book-list" id="wrong-book-list"></div>
     </section>
+
+    <section class="app-view wrong-book-view hidden" id="favorite-view" aria-label="收藏">
+      <header class="wrong-book-header">
+        <div>
+          <h2>收藏</h2>
+          <p id="favorite-summary">还没有收藏题。</p>
+        </div>
+        <div class="wrong-filters">
+          <div class="field">
+            <label for="favorite-subject-filter">科目</label>
+            <select id="favorite-subject-filter">
+              <option value="all">全部</option>
+              <option value="X">习概</option>
+              <option value="M">毛概</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="favorite-type-filter">题型</label>
+            <select id="favorite-type-filter">
+              <option value="all">全部</option>
+              <option value="single">单选</option>
+              <option value="multiple">多选</option>
+              <option value="truefalse">判断</option>
+            </select>
+          </div>
+        </div>
+      </header>
+      <div class="wrong-book-list" id="favorite-list"></div>
+    </section>
   </main>
 
   <script src="question_bank_combined_en_schema.js"></script>
@@ -691,6 +721,7 @@ const elements = {{
   viewButtons: document.querySelectorAll('[data-view]'),
   practiceView: document.getElementById('practice-view'),
   wrongBookView: document.getElementById('wrong-book-view'),
+  favoriteView: document.getElementById('favorite-view'),
   subjectFilter: document.getElementById('subject-filter'),
   typeFilter: document.getElementById('type-filter'),
   scopeFilter: document.getElementById('scope-filter'),
@@ -698,6 +729,10 @@ const elements = {{
   wrongTypeFilter: document.getElementById('wrong-type-filter'),
   wrongBookSummary: document.getElementById('wrong-book-summary'),
   wrongBookList: document.getElementById('wrong-book-list'),
+  favoriteSubjectFilter: document.getElementById('favorite-subject-filter'),
+  favoriteTypeFilter: document.getElementById('favorite-type-filter'),
+  favoriteSummary: document.getElementById('favorite-summary'),
+  favoriteList: document.getElementById('favorite-list'),
   favoriteCurrent: document.getElementById('favorite-current'),
   metaRow: document.getElementById('meta-row'),
   questionText: document.getElementById('question-text'),
@@ -746,13 +781,17 @@ function saveToday() {{
 }}
 
 function switchView(view) {{
+  const isPractice = view === 'practice';
   const isWrongBook = view === 'wrongBook';
-  elements.practiceView.classList.toggle('hidden', isWrongBook);
+  const isFavorite = view === 'favorite';
+  elements.practiceView.classList.toggle('hidden', !isPractice);
   elements.wrongBookView.classList.toggle('hidden', !isWrongBook);
+  elements.favoriteView.classList.toggle('hidden', !isFavorite);
   elements.viewButtons.forEach((button) => {{
     button.classList.toggle('active', button.dataset.view === view);
   }});
   if (isWrongBook) renderWrongBook();
+  if (isFavorite) renderFavoriteBook();
 }}
 
 function getFilteredQuestions() {{
@@ -821,6 +860,7 @@ function renderEmptyState() {{
   elements.markMastered.disabled = true;
   renderGlobalStats();
   renderWrongBook();
+  renderFavoriteBook();
 }}
 
 function renderQuestion() {{
@@ -849,6 +889,7 @@ function renderQuestion() {{
   renderCurrentStats();
   renderGlobalStats();
   renderWrongBook();
+  renderFavoriteBook();
 }}
 
 function renderQuestionMeta() {{
@@ -929,6 +970,7 @@ function submitAnswer() {{
   renderCurrentStats();
   renderGlobalStats();
   renderWrongBook();
+  renderFavoriteBook();
 }}
 
 function renderCurrentStats() {{
@@ -996,21 +1038,67 @@ function renderWrongBook() {{
       <p>${{item.question.question}}</p>
       <button type="button">练这题</button>
     `;
-    row.querySelector('button').addEventListener('click', () => {{
-      state.history = Core.rememberQuestion(
-        state.history,
-        state.current ? state.current.id : null,
-        item.question.id
-      );
-      state.current = item.question;
-      state.selected = new Set();
-      state.answered = false;
-      switchView('practice');
-      renderQuestion();
-      window.scrollTo({{ top: 0, behavior: 'smooth' }});
-    }});
+    row.querySelector('button').addEventListener('click', () => openQuestionFromList(item.question));
     elements.wrongBookList.appendChild(row);
   }});
+}}
+
+function renderFavoriteBook() {{
+  const subject = elements.favoriteSubjectFilter.value;
+  const type = elements.favoriteTypeFilter.value;
+  const allFavoriteItems = questions
+    .map((question) => ({{ question, stats: Core.getQuestionStats(state.progress, question.id) }}))
+    .filter((item) => item.stats.favorite)
+    .sort((a, b) => b.stats.wrongCount - a.stats.wrongCount || a.question.id - b.question.id);
+
+  const favoriteItems = allFavoriteItems.filter((item) => {{
+    if (subject !== 'all' && item.question.category !== subject) return false;
+    if (type !== 'all' && Core.getQuestionType(item.question) !== type) return false;
+    return true;
+  }});
+
+  elements.favoriteSummary.textContent = allFavoriteItems.length
+    ? `共 ${{allFavoriteItems.length}} 道收藏题，当前筛选显示 ${{favoriteItems.length}} 道。`
+    : '还没有收藏题。';
+
+  if (!favoriteItems.length) {{
+    elements.favoriteList.innerHTML = '<p class="empty">当前筛选下没有收藏题。</p>';
+    return;
+  }}
+
+  elements.favoriteList.innerHTML = '';
+  favoriteItems.forEach((item) => {{
+    const row = document.createElement('div');
+    row.className = 'wrong-item';
+    const questionType = Core.getQuestionType(item.question);
+    row.innerHTML = `
+      <div class="wrong-item-meta">
+        <span class="pill subject">${{Core.getSubjectLabel(item.question.category)}}</span>
+        <span class="pill type-badge">${{Core.getQuestionTypeLabel(questionType)}}</span>
+        <span class="pill">错误 ${{item.stats.wrongCount}} 次</span>
+        <span class="pill">连续答对 ${{item.stats.streak}} 次</span>
+        <span class="pill">${{item.stats.mastered ? '已掌握' : '未掌握'}}</span>
+      </div>
+      <p>${{item.question.question}}</p>
+      <button type="button">练这题</button>
+    `;
+    row.querySelector('button').addEventListener('click', () => openQuestionFromList(item.question));
+    elements.favoriteList.appendChild(row);
+  }});
+}}
+
+function openQuestionFromList(question) {{
+  state.history = Core.rememberQuestion(
+    state.history,
+    state.current ? state.current.id : null,
+    question.id
+  );
+  state.current = question;
+  state.selected = new Set();
+  state.answered = false;
+  switchView('practice');
+  renderQuestion();
+  window.scrollTo({{ top: 0, behavior: 'smooth' }});
 }}
 
 function toggleFavorite() {{
@@ -1028,6 +1116,7 @@ function toggleFavorite() {{
   renderQuestionMeta();
   renderGlobalStats();
   renderWrongBook();
+  renderFavoriteBook();
 }}
 
 function toggleMastered() {{
@@ -1047,6 +1136,7 @@ function toggleMastered() {{
   renderCurrentStats();
   renderGlobalStats();
   renderWrongBook();
+  renderFavoriteBook();
 }}
 
 function exportProgress() {{
@@ -1095,6 +1185,8 @@ elements.typeFilter.addEventListener('change', chooseNextQuestion);
 elements.scopeFilter.addEventListener('change', chooseNextQuestion);
 elements.wrongSubjectFilter.addEventListener('change', renderWrongBook);
 elements.wrongTypeFilter.addEventListener('change', renderWrongBook);
+elements.favoriteSubjectFilter.addEventListener('change', renderFavoriteBook);
+elements.favoriteTypeFilter.addEventListener('change', renderFavoriteBook);
 elements.viewButtons.forEach((button) => {{
   button.addEventListener('click', () => switchView(button.dataset.view));
 }});

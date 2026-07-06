@@ -24,6 +24,16 @@ test('wrong book is a separate app view instead of a sidebar list', () => {
   assert.match(html, /function switchView\(view\)/);
 });
 
+test('favorites are shown in a separate app view', () => {
+  assert.match(html, /id="favorite-view"/);
+  assert.match(html, /data-view="favorite"[^>]*>收藏<\/button>/);
+  assert.match(html, /id="favorite-subject-filter"/);
+  assert.match(html, /id="favorite-type-filter"/);
+  assert.match(html, /id="favorite-list"/);
+  assert.match(html, /function renderFavoriteBook\(\)/);
+  assert.match(html, /if \(isFavorite\) renderFavoriteBook\(\);/);
+});
+
 test('question bank is loaded from sibling files instead of embedded in index', () => {
   assert.doesNotMatch(html, /id="question-data"/);
   assert.doesNotMatch(html, /<script type="application\/json"/);
