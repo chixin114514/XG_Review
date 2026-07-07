@@ -64,5 +64,6 @@ test('practice toolbar can shuffle option order without changing answer keys', (
   assert.match(html, /shuffleOptions: document\.getElementById\('shuffle-options'\),/);
   assert.match(html, /function getDisplayOptionEntries\(question\)/);
   assert.match(html, /Core\.shuffleOptionEntries\(entries\)/);
+  assert.match(html, /return \{[\s\S]*shuffleOptionEntries,/);
   assert.match(html, /button\.dataset\.key = key;/);
 });

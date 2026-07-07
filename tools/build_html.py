@@ -41,6 +41,7 @@ const Core = (() => {{
     getQuestionType,
     getQuestionTypeLabel,
     normalizeAnswer,
+    shuffleOptionEntries,
     isCorrectAnswer,
     canSubmitAnswer,
     getQuestionStats,
