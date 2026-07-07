@@ -49,6 +49,7 @@ const Core = (() => {{
     getQuestionStats,
     getQuestionWeight,
     buildWeightedPool,
+    pickUniformQuestion,
     pickWeightedQuestion,
     rememberQuestion,
     takePreviousQuestion,
@@ -206,7 +207,7 @@ def build_html() -> str:
 
     .toolbar {{
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(6, minmax(0, 1fr));
       gap: 10px;
       padding: 14px;
       border-bottom: 1px solid var(--line);
@@ -622,9 +623,16 @@ def build_html() -> str:
           <div class="field">
             <label for="scope-filter">范围</label>
             <select id="scope-filter">
-              <option value="all">全题库加权</option>
+              <option value="all">全题库</option>
               <option value="wrong">只刷错题</option>
               <option value="favorite">只刷收藏</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="weight-mode-filter">抽题</label>
+            <select id="weight-mode-filter">
+              <option value="weighted">错题加权</option>
+              <option value="uniform">不加权</option>
             </select>
           </div>
           <div class="checkbox-field">
@@ -759,6 +767,7 @@ const elements = {{
   subjectFilter: document.getElementById('subject-filter'),
   typeFilter: document.getElementById('type-filter'),
   scopeFilter: document.getElementById('scope-filter'),
+  weightModeFilter: document.getElementById('weight-mode-filter'),
   shuffleOptions: document.getElementById('shuffle-options'),
   wrongSubjectFilter: document.getElementById('wrong-subject-filter'),
   wrongTypeFilter: document.getElementById('wrong-type-filter'),
@@ -857,7 +866,9 @@ function chooseNextQuestion() {{
     ? candidates.filter((question) => question.id !== state.current.id)
     : candidates;
   const previousId = state.current ? state.current.id : null;
-  const nextQuestion = Core.pickWeightedQuestion(usable, state.progress);
+  const nextQuestion = elements.weightModeFilter.value === 'uniform'
+    ? Core.pickUniformQuestion(usable)
+    : Core.pickWeightedQuestion(usable, state.progress);
   state.history = Core.rememberQuestion(state.history, previousId, nextQuestion.id);
   state.current = nextQuestion;
   state.selected = new Set();
@@ -946,6 +957,7 @@ function renderQuestionMeta() {{
   const stats = Core.getQuestionStats(state.progress, question.id);
   const type = Core.getQuestionType(question);
   const weight = Core.getQuestionWeight(stats);
+  const weightLabel = elements.weightModeFilter.value === 'uniform' ? '不加权' : `权重 ${{weight}}`;
 
   elements.submitAnswer.textContent = state.answered ? '下一题' : '提交';
   elements.previousQuestion.disabled = state.history.length === 0;
@@ -956,7 +968,7 @@ function renderQuestionMeta() {{
     `<span class="pill subject">${{Core.getSubjectLabel(question.category)}}</span>`,
     `<span class="pill type-badge">${{Core.getQuestionTypeLabel(type)}}</span>`,
     `<span class="pill">错误 ${{stats.wrongCount}} 次</span>`,
-    `<span class="pill">权重 ${{weight}}</span>`,
+    `<span class="pill">${{weightLabel}}</span>`,
   ].join('');
 }}
 
@@ -1244,6 +1256,7 @@ function resetProgress() {{
 elements.subjectFilter.addEventListener('change', chooseNextQuestion);
 elements.typeFilter.addEventListener('change', chooseNextQuestion);
 elements.scopeFilter.addEventListener('change', chooseNextQuestion);
+elements.weightModeFilter.addEventListener('change', chooseNextQuestion);
 elements.shuffleOptions.addEventListener('change', reshuffleCurrentOptions);
 elements.wrongSubjectFilter.addEventListener('change', renderWrongBook);
 elements.wrongTypeFilter.addEventListener('change', renderWrongBook);

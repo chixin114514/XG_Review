@@ -69,3 +69,13 @@ test('practice toolbar can shuffle option values while keeping visible labels fi
   assert.match(html, /button\.dataset\.key = key;/);
   assert.match(html, /button\.dataset\.originalKey = originalKey;/);
 });
+
+test('practice toolbar can switch between weighted and uniform question picking', () => {
+  assert.match(html, /id="weight-mode-filter"/);
+  assert.match(html, /<option value="weighted">错题加权<\/option>/);
+  assert.match(html, /<option value="uniform">不加权<\/option>/);
+  assert.match(html, /weightModeFilter: document\.getElementById\('weight-mode-filter'\),/);
+  assert.match(html, /elements\.weightModeFilter\.value === 'uniform'/);
+  assert.match(html, /Core\.pickUniformQuestion\(usable\)/);
+  assert.match(html, /Core\.pickWeightedQuestion\(usable, state\.progress\)/);
+});

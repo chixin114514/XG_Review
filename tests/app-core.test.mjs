@@ -10,6 +10,7 @@ import {
   getQuestionStats,
   getQuestionWeight,
   buildWeightedPool,
+  pickUniformQuestion,
   pickWeightedQuestion,
   rememberQuestion,
   getDisplayedCorrectAnswer,
@@ -100,6 +101,13 @@ test('picks from the weighted pool deterministically when random value is inject
   assert.equal(pickWeightedQuestion(sampleQuestions, progress, () => 0).id, 0);
   assert.equal(pickWeightedQuestion(sampleQuestions, progress, () => 0.2).id, 1);
   assert.equal(pickWeightedQuestion(sampleQuestions, progress, () => 0.99).id, 2);
+});
+
+test('picks uniformly from question list without using mistake weights', () => {
+  assert.equal(pickUniformQuestion(sampleQuestions, () => 0).id, 0);
+  assert.equal(pickUniformQuestion(sampleQuestions, () => 0.34).id, 1);
+  assert.equal(pickUniformQuestion(sampleQuestions, () => 0.99).id, 2);
+  assert.equal(pickUniformQuestion([], () => 0), null);
 });
 
 test('returns default stats for unseen questions', () => {

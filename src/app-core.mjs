@@ -128,6 +128,13 @@ export function pickWeightedQuestion(questions, progress, random = Math.random) 
   return questions.find((question) => question.id === pickedId) || questions[0];
 }
 
+export function pickUniformQuestion(questions, random = Math.random) {
+  if (!questions.length) return null;
+
+  const index = Math.min(questions.length - 1, Math.floor(random() * questions.length));
+  return questions[index];
+}
+
 export function rememberQuestion(history, currentId, nextId, maxLength = 100) {
   if (currentId === null || currentId === undefined || currentId === nextId) {
     return history;
