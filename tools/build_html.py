@@ -10,6 +10,8 @@ OUTPUT = ROOT / "index.html"
 CORE = ROOT / "src" / "app-core.mjs"
 LOCAL_BANK_JSON = ROOT / "question_bank_combined_en_schema.json"
 LOCAL_BANK_JS = ROOT / "question_bank_combined_en_schema.js"
+SERIES_BANK_JSON = ROOT / "x_same_series_selected_renamed.json"
+SERIES_BANK_JS = ROOT / "x_same_series_selected_renamed.js"
 
 
 def load_questions() -> list[dict]:
@@ -24,6 +26,19 @@ def write_question_bank_files(questions: list[dict]) -> None:
     LOCAL_BANK_JS.write_text(
         "window.QUESTION_BANK = "
         + json.dumps(questions, ensure_ascii=False, separators=(",", ":"))
+        + ";\n",
+        encoding="utf-8",
+    )
+
+
+def load_series_bank() -> list[dict]:
+    return json.loads(SERIES_BANK_JSON.read_text(encoding="utf-8"))
+
+
+def write_series_bank_file(series_bank: list[dict]) -> None:
+    SERIES_BANK_JS.write_text(
+        "window.SAME_SERIES_BANK = "
+        + json.dumps(series_bank, ensure_ascii=False, separators=(",", ":"))
         + ";\n",
         encoding="utf-8",
     )
@@ -537,6 +552,19 @@ def build_html() -> str:
       line-height: 1.55;
     }}
 
+    .series-controls {{
+      display: grid;
+      grid-template-columns: minmax(240px, 1fr) minmax(160px, 220px) auto;
+      gap: 10px;
+      align-items: end;
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+    }}
+
+    .series-question-area {{
+      padding: 22px;
+    }}
+
     .wrong-item {{
       display: grid;
       gap: 6px;
@@ -593,6 +621,7 @@ def build_html() -> str:
       .stats-strip,
       .toolbar,
       .paper-controls,
+      .series-controls,
       .wrong-filters {{
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }}
@@ -607,6 +636,7 @@ def build_html() -> str:
       .stats-strip,
       .toolbar,
       .paper-controls,
+      .series-controls,
       .wrong-filters,
       .storage-row {{
         grid-template-columns: 1fr;
@@ -641,6 +671,7 @@ def build_html() -> str:
     <nav class="view-nav" aria-label="视图切换">
       <button class="view-tab active" data-view="practice" type="button">刷题</button>
       <button class="view-tab" data-view="paper" type="button">组卷</button>
+      <button class="view-tab" data-view="series" type="button">专题复习</button>
       <button class="view-tab" data-view="wrongBook" type="button">错题本</button>
       <button class="view-tab" data-view="favorite" type="button">收藏</button>
     </nav>
@@ -722,6 +753,38 @@ def build_html() -> str:
           </div>
         </section>
       </aside>
+    </section>
+
+    <section class="app-view wrong-book-view hidden" id="series-view" aria-label="专题复习">
+      <header class="wrong-book-header">
+        <div>
+          <h2>专题复习</h2>
+          <p id="series-summary">选择一个同系列专题开始复习。</p>
+        </div>
+      </header>
+      <div class="series-controls">
+        <div class="field">
+          <label for="series-select">系列</label>
+          <select id="series-select"></select>
+        </div>
+        <div class="checkbox-field">
+          <label for="series-shuffle-options">
+            <input id="series-shuffle-options" type="checkbox">
+            打乱内容
+          </label>
+        </div>
+        <button class="primary-button" id="start-series" type="button">开始专题</button>
+      </div>
+      <div class="series-question-area">
+        <div class="meta-row" id="series-meta-row"></div>
+        <h2 class="question-text" id="series-question-text">请选择系列。</h2>
+        <div class="options" id="series-options"></div>
+        <div class="actions">
+          <button class="primary-button" id="series-submit-answer" type="button" disabled>提交</button>
+          <button class="ghost-button" id="series-skip-question" type="button" disabled>跳过</button>
+        </div>
+        <div class="feedback" id="series-feedback"></div>
+      </div>
     </section>
 
     <section class="app-view wrong-book-view hidden" id="paper-view" aria-label="组卷">
@@ -828,6 +891,7 @@ def build_html() -> str:
   </main>
 
   <script src="question_bank_combined_en_schema.js"></script>
+  <script src="x_same_series_selected_renamed.js"></script>
   <script>
 {core_js}
 
@@ -837,6 +901,17 @@ const questions = (window.QUESTION_BANK || []).map((question, index) => ({{
   ...question,
   id: index,
 }}));
+const seriesBank = (window.SAME_SERIES_BANK || []).map((series, seriesIndex) => {{
+  const name = series.SERIES || `SERIES_${{seriesIndex + 1}}`;
+  return {{
+    ...series,
+    name,
+    questions: (series.questions || []).map((question, questionIndex) => ({{
+      ...question,
+      id: `${{name}}-${{questionIndex}}`,
+    }})),
+  }};
+}});
 
 const state = {{
   progress: loadProgress(),
@@ -849,12 +924,18 @@ const state = {{
   paperQuestions: [],
   paperSelections: {{}},
   paperSubmitted: false,
+  seriesQuestions: [],
+  seriesCurrent: null,
+  seriesSelected: new Set(),
+  seriesAnswered: false,
+  seriesDisplayCorrectAnswer: [],
 }};
 
 const elements = {{
   viewButtons: document.querySelectorAll('[data-view]'),
   practiceView: document.getElementById('practice-view'),
   paperView: document.getElementById('paper-view'),
+  seriesView: document.getElementById('series-view'),
   wrongBookView: document.getElementById('wrong-book-view'),
   favoriteView: document.getElementById('favorite-view'),
   subjectFilter: document.getElementById('subject-filter'),
@@ -870,6 +951,16 @@ const elements = {{
   submitPaper: document.getElementById('submit-paper'),
   paperSummary: document.getElementById('paper-summary'),
   paperList: document.getElementById('paper-list'),
+  seriesSelect: document.getElementById('series-select'),
+  seriesShuffleOptions: document.getElementById('series-shuffle-options'),
+  startSeries: document.getElementById('start-series'),
+  seriesSummary: document.getElementById('series-summary'),
+  seriesMetaRow: document.getElementById('series-meta-row'),
+  seriesQuestionText: document.getElementById('series-question-text'),
+  seriesOptions: document.getElementById('series-options'),
+  seriesSubmitAnswer: document.getElementById('series-submit-answer'),
+  seriesSkipQuestion: document.getElementById('series-skip-question'),
+  seriesFeedback: document.getElementById('series-feedback'),
   wrongSubjectFilter: document.getElementById('wrong-subject-filter'),
   wrongTypeFilter: document.getElementById('wrong-type-filter'),
   wrongBookSummary: document.getElementById('wrong-book-summary'),
@@ -928,16 +1019,19 @@ function saveToday() {{
 function switchView(view) {{
   const isPractice = view === 'practice';
   const isPaper = view === 'paper';
+  const isSeries = view === 'series';
   const isWrongBook = view === 'wrongBook';
   const isFavorite = view === 'favorite';
   elements.practiceView.classList.toggle('hidden', !isPractice);
   elements.paperView.classList.toggle('hidden', !isPaper);
+  elements.seriesView.classList.toggle('hidden', !isSeries);
   elements.wrongBookView.classList.toggle('hidden', !isWrongBook);
   elements.favoriteView.classList.toggle('hidden', !isFavorite);
   elements.viewButtons.forEach((button) => {{
     button.classList.toggle('active', button.dataset.view === view);
   }});
   if (isPaper) renderPaper();
+  if (isSeries) renderSeriesQuestion();
   if (isWrongBook) renderWrongBook();
   if (isFavorite) renderFavoriteBook();
 }}
@@ -1327,6 +1421,177 @@ function submitPaper() {{
   renderFavoriteBook();
 }}
 
+function populateSeriesSelect() {{
+  elements.seriesSelect.innerHTML = '';
+  if (!seriesBank.length) {{
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = '没有专题数据';
+    elements.seriesSelect.appendChild(option);
+    elements.startSeries.disabled = true;
+    return;
+  }}
+
+  seriesBank.forEach((series) => {{
+    const option = document.createElement('option');
+    option.value = series.name;
+    option.textContent = `${{series.name}}（${{series.questions.length}} 题）`;
+    elements.seriesSelect.appendChild(option);
+  }});
+}}
+
+function getSelectedSeries() {{
+  return seriesBank.find((series) => series.name === elements.seriesSelect.value) || null;
+}}
+
+function startSeriesReview() {{
+  const series = getSelectedSeries();
+  state.seriesQuestions = series ? series.questions.slice() : [];
+  state.seriesCurrent = null;
+  state.seriesSelected = new Set();
+  state.seriesAnswered = false;
+  state.seriesDisplayCorrectAnswer = [];
+  chooseNextSeriesQuestion();
+}}
+
+function chooseNextSeriesQuestion() {{
+  if (!state.seriesQuestions.length) {{
+    state.seriesCurrent = null;
+    renderSeriesQuestion();
+    return;
+  }}
+
+  const usable = state.seriesQuestions.length > 1 && state.seriesCurrent
+    ? state.seriesQuestions.filter((question) => question.id !== state.seriesCurrent.id)
+    : state.seriesQuestions;
+  state.seriesCurrent = Core.pickUniformQuestion(usable);
+  state.seriesSelected = new Set();
+  state.seriesAnswered = false;
+  state.seriesDisplayCorrectAnswer = [];
+  renderSeriesQuestion();
+}}
+
+function getSeriesDisplayOptionEntries(question) {{
+  const entries = Object.entries(question.options);
+  return elements.seriesShuffleOptions.checked
+    ? Core.shuffleOptionValues(entries)
+    : entries.map(([key, value]) => [key, value, key]);
+}}
+
+function renderSeriesQuestion() {{
+  const series = getSelectedSeries();
+  if (!seriesBank.length) {{
+    elements.seriesSummary.textContent = '没有专题数据。';
+    elements.seriesMetaRow.innerHTML = '';
+    elements.seriesQuestionText.textContent = '未找到同系列专题文件。';
+    elements.seriesOptions.innerHTML = '';
+    elements.seriesSubmitAnswer.disabled = true;
+    elements.seriesSkipQuestion.disabled = true;
+    elements.seriesFeedback.textContent = '';
+    return;
+  }}
+
+  if (!state.seriesCurrent) {{
+    elements.seriesSummary.textContent = series
+      ? `${{series.name}}，共 ${{series.questions.length}} 题。`
+      : '选择一个同系列专题开始复习。';
+    elements.seriesMetaRow.innerHTML = '';
+    elements.seriesQuestionText.textContent = '请选择系列后开始专题。';
+    elements.seriesOptions.innerHTML = '';
+    elements.seriesSubmitAnswer.disabled = true;
+    elements.seriesSkipQuestion.disabled = true;
+    elements.seriesFeedback.textContent = '';
+    elements.seriesFeedback.className = 'feedback';
+    return;
+  }}
+
+  const question = state.seriesCurrent;
+  const displayEntries = getSeriesDisplayOptionEntries(question);
+  state.seriesDisplayCorrectAnswer = Core.getDisplayedCorrectAnswer(displayEntries, question.correct_answer);
+  const type = Core.getQuestionType(question);
+  elements.seriesSummary.textContent = `${{elements.seriesSelect.value}}，专题复习不计入全局统计。`;
+  elements.seriesMetaRow.innerHTML = [
+    `<span class="pill subject">${{Core.getSubjectLabel(question.category)}}</span>`,
+    `<span class="pill type-badge">${{Core.getQuestionTypeLabel(type)}}</span>`,
+    `<span class="pill">${{elements.seriesShuffleOptions.checked ? '打乱内容' : '原始内容'}}</span>`,
+  ].join('');
+  elements.seriesQuestionText.textContent = question.question;
+  elements.seriesOptions.innerHTML = '';
+  elements.seriesSubmitAnswer.disabled = false;
+  elements.seriesSubmitAnswer.textContent = state.seriesAnswered ? '下一题' : '提交';
+  elements.seriesSkipQuestion.disabled = false;
+
+  displayEntries.forEach(([key, value, originalKey]) => {{
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'option';
+    button.dataset.key = key;
+    button.dataset.originalKey = originalKey;
+    button.innerHTML = `<span class="option-key">${{key}}</span><span>${{value}}</span>`;
+    button.disabled = state.seriesAnswered;
+    button.classList.toggle('selected', state.seriesSelected.has(key));
+    if (state.seriesAnswered) {{
+      if (state.seriesDisplayCorrectAnswer.includes(key)) button.classList.add('correct');
+      if (state.seriesSelected.has(key) && !state.seriesDisplayCorrectAnswer.includes(key)) {{
+        button.classList.add('wrong');
+      }}
+    }}
+    button.addEventListener('click', () => toggleSeriesOption(key));
+    elements.seriesOptions.appendChild(button);
+  }});
+
+  if (!state.seriesAnswered) {{
+    elements.seriesFeedback.textContent = type === 'multiple' ? '多选题至少选择两个选项。' : '';
+    elements.seriesFeedback.className = 'feedback';
+  }}
+}}
+
+function toggleSeriesOption(key) {{
+  if (!state.seriesCurrent || state.seriesAnswered) return;
+  const type = Core.getQuestionType(state.seriesCurrent);
+  if (type === 'multiple') {{
+    if (state.seriesSelected.has(key)) state.seriesSelected.delete(key);
+    else state.seriesSelected.add(key);
+  }} else {{
+    state.seriesSelected = new Set([key]);
+  }}
+
+  [...elements.seriesOptions.children].forEach((button) => {{
+    button.classList.toggle('selected', state.seriesSelected.has(button.dataset.key));
+  }});
+}}
+
+function reshuffleSeriesQuestion() {{
+  if (!state.seriesCurrent || state.seriesAnswered) return;
+  renderSeriesQuestion();
+}}
+
+function submitSeriesAnswer() {{
+  if (!state.seriesCurrent) return;
+  if (state.seriesAnswered) {{
+    chooseNextSeriesQuestion();
+    return;
+  }}
+
+  const validation = Core.canSubmitAnswer(state.seriesCurrent, [...state.seriesSelected]);
+  if (!validation.ok) {{
+    elements.seriesFeedback.textContent = validation.message;
+    elements.seriesFeedback.className = 'feedback bad';
+    return;
+  }}
+
+  const selected = [...state.seriesSelected];
+  const correctAnswer = state.seriesDisplayCorrectAnswer.length
+    ? state.seriesDisplayCorrectAnswer
+    : state.seriesCurrent.correct_answer;
+  const wasCorrect = Core.isCorrectAnswer(selected, correctAnswer);
+  const correctText = Core.normalizeAnswer(correctAnswer).join('、');
+  state.seriesAnswered = true;
+  elements.seriesFeedback.textContent = `${{wasCorrect ? '正确' : '错误'}}。标准答案：${{correctText}}。`;
+  elements.seriesFeedback.className = `feedback ${{wasCorrect ? 'good' : 'bad'}}`;
+  renderSeriesQuestion();
+}}
+
 function renderWrongBook() {{
   const subject = elements.wrongSubjectFilter.value;
   const type = elements.wrongTypeFilter.value;
@@ -1516,6 +1781,15 @@ elements.weightModeFilter.addEventListener('change', chooseNextQuestion);
 elements.shuffleOptions.addEventListener('change', reshuffleCurrentOptions);
 elements.generatePaper.addEventListener('click', generatePaper);
 elements.submitPaper.addEventListener('click', submitPaper);
+elements.startSeries.addEventListener('click', startSeriesReview);
+elements.seriesSelect.addEventListener('change', () => {{
+  state.seriesCurrent = null;
+  state.seriesQuestions = [];
+  renderSeriesQuestion();
+}});
+elements.seriesShuffleOptions.addEventListener('change', reshuffleSeriesQuestion);
+elements.seriesSubmitAnswer.addEventListener('click', submitSeriesAnswer);
+elements.seriesSkipQuestion.addEventListener('click', chooseNextSeriesQuestion);
 elements.wrongSubjectFilter.addEventListener('change', renderWrongBook);
 elements.wrongTypeFilter.addEventListener('change', renderWrongBook);
 elements.favoriteSubjectFilter.addEventListener('change', renderFavoriteBook);
@@ -1537,6 +1811,7 @@ elements.importProgress.addEventListener('change', (event) => {{
 }});
 elements.resetProgress.addEventListener('click', resetProgress);
 
+populateSeriesSelect();
 chooseNextQuestion();
   </script>
 </body>
@@ -1546,7 +1821,9 @@ chooseNextQuestion();
 
 if __name__ == "__main__":
     write_question_bank_files(load_questions())
+    write_series_bank_file(load_series_bank())
     OUTPUT.write_text(build_html(), encoding="utf-8")
     print(f"Wrote {OUTPUT}")
     print(f"Wrote {LOCAL_BANK_JSON}")
     print(f"Wrote {LOCAL_BANK_JS}")
+    print(f"Wrote {SERIES_BANK_JS}")

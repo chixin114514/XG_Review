@@ -38,9 +38,13 @@ test('question bank is loaded from sibling files instead of embedded in index', 
   assert.doesNotMatch(html, /id="question-data"/);
   assert.doesNotMatch(html, /<script type="application\/json"/);
   assert.match(html, /<script src="question_bank_combined_en_schema\.js"><\/script>/);
+  assert.match(html, /<script src="x_same_series_selected_renamed\.js"><\/script>/);
   assert.match(html, /window\.QUESTION_BANK/);
+  assert.match(html, /window\.SAME_SERIES_BANK/);
   assert.equal(existsSync(new URL('../question_bank_combined_en_schema.json', import.meta.url)), true);
   assert.equal(existsSync(new URL('../question_bank_combined_en_schema.js', import.meta.url)), true);
+  assert.equal(existsSync(new URL('../x_same_series_selected_renamed.json', import.meta.url)), true);
+  assert.equal(existsSync(new URL('../x_same_series_selected_renamed.js', import.meta.url)), true);
 });
 
 test('question metadata does not reveal the correct answer before submission', () => {
@@ -94,4 +98,23 @@ test('paper view supports filtered exam generation and hides answers until compl
   assert.match(html, /Core\.selectPaperQuestions\(/);
   assert.match(html, /if \(!isPaperComplete\(\)\)/);
   assert.match(html, /if \(state\.paperSubmitted\) \{/);
+});
+
+test('series review view loads same-series data and does not write global progress', () => {
+  assert.match(html, /data-view="series"[^>]*>专题复习<\/button>/);
+  assert.match(html, /id="series-view"/);
+  assert.match(html, /id="series-select"/);
+  assert.match(html, /id="series-shuffle-options"/);
+  assert.match(html, /id="start-series"/);
+  assert.match(html, /id="series-submit-answer"/);
+  assert.match(html, /const seriesBank = \(window\.SAME_SERIES_BANK \|\| \[\]\)/);
+  assert.match(html, /function startSeriesReview\(\)/);
+  assert.match(html, /function submitSeriesAnswer\(\)/);
+  assert.match(html, /function renderSeriesQuestion\(\)/);
+  assert.match(html, /Core\.pickUniformQuestion\(usable\)/);
+
+  const submitSeriesBody = html.match(/function submitSeriesAnswer\(\) \{([\s\S]*?)\n\}/)?.[1] || '';
+  assert.doesNotMatch(submitSeriesBody, /updateProgressAfterAnswer/);
+  assert.doesNotMatch(submitSeriesBody, /state\.today\.count/);
+  assert.doesNotMatch(submitSeriesBody, /saveProgress\(\)/);
 });
