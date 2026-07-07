@@ -135,6 +135,29 @@ export function pickUniformQuestion(questions, random = Math.random) {
   return questions[index];
 }
 
+export function selectPaperQuestions(
+  questions,
+  progress,
+  count,
+  mode = 'weighted',
+  random = Math.random
+) {
+  const selected = [];
+  let remaining = questions.slice();
+  const targetCount = Math.max(0, Math.min(Number(count) || 0, remaining.length));
+
+  for (let index = 0; index < targetCount; index += 1) {
+    const next = mode === 'uniform'
+      ? pickUniformQuestion(remaining, random)
+      : pickWeightedQuestion(remaining, progress, random);
+    if (!next) break;
+    selected.push(next);
+    remaining = remaining.filter((question) => question.id !== next.id);
+  }
+
+  return selected;
+}
+
 export function rememberQuestion(history, currentId, nextId, maxLength = 100) {
   if (currentId === null || currentId === undefined || currentId === nextId) {
     return history;

@@ -51,6 +51,7 @@ const Core = (() => {{
     buildWeightedPool,
     pickUniformQuestion,
     pickWeightedQuestion,
+    selectPaperQuestions,
     rememberQuestion,
     takePreviousQuestion,
     updateProgressAfterAnswer,
@@ -220,7 +221,8 @@ def build_html() -> str:
       font-size: 12px;
     }}
 
-    .field select {{
+    .field select,
+    .field input {{
       width: 100%;
       min-height: 40px;
       padding: 8px 10px;
@@ -495,6 +497,46 @@ def build_html() -> str:
       padding: 16px;
     }}
 
+    .paper-controls {{
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+    }}
+
+    .paper-actions {{
+      display: flex;
+      gap: 10px;
+      align-items: end;
+    }}
+
+    .paper-list {{
+      display: grid;
+      gap: 14px;
+      padding: 16px;
+    }}
+
+    .paper-item {{
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border: 1px solid rgba(216, 205, 187, 0.9);
+      background: rgba(248, 243, 231, 0.7);
+    }}
+
+    .paper-question {{
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.55;
+      font-weight: 800;
+    }}
+
+    .paper-answer {{
+      margin: 0;
+      line-height: 1.55;
+    }}
+
     .wrong-item {{
       display: grid;
       gap: 6px;
@@ -550,6 +592,7 @@ def build_html() -> str:
 
       .stats-strip,
       .toolbar,
+      .paper-controls,
       .wrong-filters {{
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }}
@@ -563,6 +606,7 @@ def build_html() -> str:
 
       .stats-strip,
       .toolbar,
+      .paper-controls,
       .wrong-filters,
       .storage-row {{
         grid-template-columns: 1fr;
@@ -596,6 +640,7 @@ def build_html() -> str:
 
     <nav class="view-nav" aria-label="视图切换">
       <button class="view-tab active" data-view="practice" type="button">刷题</button>
+      <button class="view-tab" data-view="paper" type="button">组卷</button>
       <button class="view-tab" data-view="wrongBook" type="button">错题本</button>
       <button class="view-tab" data-view="favorite" type="button">收藏</button>
     </nav>
@@ -679,6 +724,50 @@ def build_html() -> str:
       </aside>
     </section>
 
+    <section class="app-view wrong-book-view hidden" id="paper-view" aria-label="组卷">
+      <header class="wrong-book-header">
+        <div>
+          <h2>组卷</h2>
+          <p id="paper-summary">选择条件后生成试卷。</p>
+        </div>
+      </header>
+      <div class="paper-controls">
+        <div class="field">
+          <label for="paper-subject-filter">科目</label>
+          <select id="paper-subject-filter">
+            <option value="all">全部</option>
+            <option value="X">习概</option>
+            <option value="M">毛概</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="paper-type-filter">题型</label>
+          <select id="paper-type-filter">
+            <option value="all">全部</option>
+            <option value="single">单选</option>
+            <option value="multiple">多选</option>
+            <option value="truefalse">判断</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="paper-weight-mode-filter">抽题</label>
+          <select id="paper-weight-mode-filter">
+            <option value="weighted">错题加权</option>
+            <option value="uniform">不加权</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="paper-count">题量</label>
+          <input id="paper-count" type="number" min="1" max="100" value="20">
+        </div>
+        <div class="paper-actions">
+          <button class="primary-button" id="generate-paper" type="button">生成试卷</button>
+          <button class="ghost-button" id="submit-paper" type="button" disabled>交卷看答案</button>
+        </div>
+      </div>
+      <div class="paper-list" id="paper-list"></div>
+    </section>
+
     <section class="app-view wrong-book-view hidden" id="wrong-book-view" aria-label="错题本">
       <header class="wrong-book-header">
         <div>
@@ -757,11 +846,15 @@ const state = {{
   selected: new Set(),
   displayCorrectAnswer: [],
   answered: false,
+  paperQuestions: [],
+  paperSelections: {{}},
+  paperSubmitted: false,
 }};
 
 const elements = {{
   viewButtons: document.querySelectorAll('[data-view]'),
   practiceView: document.getElementById('practice-view'),
+  paperView: document.getElementById('paper-view'),
   wrongBookView: document.getElementById('wrong-book-view'),
   favoriteView: document.getElementById('favorite-view'),
   subjectFilter: document.getElementById('subject-filter'),
@@ -769,6 +862,14 @@ const elements = {{
   scopeFilter: document.getElementById('scope-filter'),
   weightModeFilter: document.getElementById('weight-mode-filter'),
   shuffleOptions: document.getElementById('shuffle-options'),
+  paperSubjectFilter: document.getElementById('paper-subject-filter'),
+  paperTypeFilter: document.getElementById('paper-type-filter'),
+  paperWeightModeFilter: document.getElementById('paper-weight-mode-filter'),
+  paperCount: document.getElementById('paper-count'),
+  generatePaper: document.getElementById('generate-paper'),
+  submitPaper: document.getElementById('submit-paper'),
+  paperSummary: document.getElementById('paper-summary'),
+  paperList: document.getElementById('paper-list'),
   wrongSubjectFilter: document.getElementById('wrong-subject-filter'),
   wrongTypeFilter: document.getElementById('wrong-type-filter'),
   wrongBookSummary: document.getElementById('wrong-book-summary'),
@@ -826,14 +927,17 @@ function saveToday() {{
 
 function switchView(view) {{
   const isPractice = view === 'practice';
+  const isPaper = view === 'paper';
   const isWrongBook = view === 'wrongBook';
   const isFavorite = view === 'favorite';
   elements.practiceView.classList.toggle('hidden', !isPractice);
+  elements.paperView.classList.toggle('hidden', !isPaper);
   elements.wrongBookView.classList.toggle('hidden', !isWrongBook);
   elements.favoriteView.classList.toggle('hidden', !isFavorite);
   elements.viewButtons.forEach((button) => {{
     button.classList.toggle('active', button.dataset.view === view);
   }});
+  if (isPaper) renderPaper();
   if (isWrongBook) renderWrongBook();
   if (isFavorite) renderFavoriteBook();
 }}
@@ -1071,6 +1175,158 @@ function renderGlobalStats() {{
   elements.bankTotal.textContent = String(questions.length);
 }}
 
+function getPaperCandidates() {{
+  const subject = elements.paperSubjectFilter.value;
+  const type = elements.paperTypeFilter.value;
+
+  return questions.filter((question) => {{
+    if (subject !== 'all' && question.category !== subject) return false;
+    if (type !== 'all' && Core.getQuestionType(question) !== type) return false;
+    return true;
+  }});
+}}
+
+function generatePaper() {{
+  const candidates = getPaperCandidates();
+  if (!candidates.length) {{
+    state.paperQuestions = [];
+    state.paperSelections = {{}};
+    state.paperSubmitted = false;
+    renderPaper();
+    return;
+  }}
+
+  const requestedCount = Math.max(1, Number.parseInt(elements.paperCount.value, 10) || 20);
+  const count = Math.min(requestedCount, candidates.length);
+  state.paperQuestions = Core.selectPaperQuestions(
+    candidates,
+    state.progress,
+    count,
+    elements.paperWeightModeFilter.value
+  );
+  state.paperSelections = {{}};
+  state.paperSubmitted = false;
+  renderPaper();
+}}
+
+function getPaperSelection(questionId) {{
+  const id = String(questionId);
+  if (!state.paperSelections[id]) state.paperSelections[id] = new Set();
+  return state.paperSelections[id];
+}}
+
+function isPaperComplete() {{
+  return state.paperQuestions.length > 0 && state.paperQuestions.every((question) => {{
+    const validation = Core.canSubmitAnswer(question, [...getPaperSelection(question.id)]);
+    return validation.ok;
+  }});
+}}
+
+function togglePaperOption(question, key) {{
+  if (state.paperSubmitted) return;
+  const selection = getPaperSelection(question.id);
+  const type = Core.getQuestionType(question);
+
+  if (type === 'multiple') {{
+    if (selection.has(key)) selection.delete(key);
+    else selection.add(key);
+  }} else {{
+    selection.clear();
+    selection.add(key);
+  }}
+
+  renderPaper();
+}}
+
+function renderPaper() {{
+  const answeredCount = state.paperQuestions.filter((question) => {{
+    return Core.canSubmitAnswer(question, [...getPaperSelection(question.id)]).ok;
+  }}).length;
+  const total = state.paperQuestions.length;
+  const complete = isPaperComplete();
+
+  elements.submitPaper.disabled = !complete || state.paperSubmitted;
+  elements.submitPaper.textContent = state.paperSubmitted ? '已交卷' : '交卷看答案';
+
+  if (!total) {{
+    elements.paperSummary.textContent = '选择条件后生成试卷。';
+    elements.paperList.innerHTML = '<p class="empty">还没有生成试卷。</p>';
+    return;
+  }}
+
+  elements.paperSummary.textContent = state.paperSubmitted
+    ? `已交卷，共 ${{total}} 题。`
+    : `已完成 ${{answeredCount}} / ${{total}} 题，全部完成后才能看答案。`;
+  elements.paperList.innerHTML = '';
+
+  state.paperQuestions.forEach((question, index) => {{
+    const row = document.createElement('section');
+    row.className = 'paper-item';
+    const type = Core.getQuestionType(question);
+    const selection = getPaperSelection(question.id);
+    const selected = [...selection];
+    const correctAnswer = Core.normalizeAnswer(question.correct_answer);
+    const isCorrect = state.paperSubmitted && Core.isCorrectAnswer(selected, correctAnswer);
+    row.innerHTML = `
+      <div class="wrong-item-meta">
+        <span class="pill">${{index + 1}}</span>
+        <span class="pill subject">${{Core.getSubjectLabel(question.category)}}</span>
+        <span class="pill type-badge">${{Core.getQuestionTypeLabel(type)}}</span>
+      </div>
+      <p class="paper-question">${{question.question}}</p>
+      <div class="options"></div>
+    `;
+
+    const optionWrap = row.querySelector('.options');
+    Object.entries(question.options).forEach(([key, value]) => {{
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'option';
+      button.dataset.key = key;
+      button.disabled = state.paperSubmitted;
+      button.innerHTML = `<span class="option-key">${{key}}</span><span>${{value}}</span>`;
+      button.classList.toggle('selected', selection.has(key));
+      if (state.paperSubmitted) {{
+        if (correctAnswer.includes(key)) button.classList.add('correct');
+        if (selection.has(key) && !correctAnswer.includes(key)) button.classList.add('wrong');
+      }}
+      button.addEventListener('click', () => togglePaperOption(question, key));
+      optionWrap.appendChild(button);
+    }});
+
+    if (state.paperSubmitted) {{
+      const answer = document.createElement('p');
+      answer.className = `paper-answer feedback ${{isCorrect ? 'good' : 'bad'}}`;
+      answer.textContent = `${{isCorrect ? '正确' : '错误'}}。标准答案：${{correctAnswer.join('、')}}。`;
+      row.appendChild(answer);
+    }}
+
+    elements.paperList.appendChild(row);
+  }});
+}}
+
+function submitPaper() {{
+  if (state.paperSubmitted) return;
+  if (!isPaperComplete()) {{
+    elements.paperSummary.textContent = '还有题目没有作答完整，全部完成后才能看答案。';
+    return;
+  }}
+
+  for (const question of state.paperQuestions) {{
+    const selected = [...getPaperSelection(question.id)];
+    const wasCorrect = Core.isCorrectAnswer(selected, question.correct_answer);
+    state.progress = Core.updateProgressAfterAnswer(state.progress, question.id, wasCorrect);
+    state.today.count += 1;
+  }}
+  state.paperSubmitted = true;
+  saveProgress();
+  saveToday();
+  renderPaper();
+  renderGlobalStats();
+  renderWrongBook();
+  renderFavoriteBook();
+}}
+
 function renderWrongBook() {{
   const subject = elements.wrongSubjectFilter.value;
   const type = elements.wrongTypeFilter.value;
@@ -1258,6 +1514,8 @@ elements.typeFilter.addEventListener('change', chooseNextQuestion);
 elements.scopeFilter.addEventListener('change', chooseNextQuestion);
 elements.weightModeFilter.addEventListener('change', chooseNextQuestion);
 elements.shuffleOptions.addEventListener('change', reshuffleCurrentOptions);
+elements.generatePaper.addEventListener('click', generatePaper);
+elements.submitPaper.addEventListener('click', submitPaper);
 elements.wrongSubjectFilter.addEventListener('change', renderWrongBook);
 elements.wrongTypeFilter.addEventListener('change', renderWrongBook);
 elements.favoriteSubjectFilter.addEventListener('change', renderFavoriteBook);

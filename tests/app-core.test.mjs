@@ -13,6 +13,7 @@ import {
   pickUniformQuestion,
   pickWeightedQuestion,
   rememberQuestion,
+  selectPaperQuestions,
   getDisplayedCorrectAnswer,
   shuffleOptionValues,
   takePreviousQuestion,
@@ -108,6 +109,25 @@ test('picks uniformly from question list without using mistake weights', () => {
   assert.equal(pickUniformQuestion(sampleQuestions, () => 0.34).id, 1);
   assert.equal(pickUniformQuestion(sampleQuestions, () => 0.99).id, 2);
   assert.equal(pickUniformQuestion([], () => 0), null);
+});
+
+test('selects paper questions without replacement using the requested mode', () => {
+  const progress = {
+    '0': { wrongCount: 0, mastered: false },
+    '1': { wrongCount: 2, mastered: false },
+    '2': { wrongCount: 0, mastered: false },
+  };
+
+  assert.deepEqual(
+    selectPaperQuestions(sampleQuestions, progress, 2, 'uniform', () => 0).map((question) => question.id),
+    [0, 1]
+  );
+  const weightedRandomValues = [0.4, 0.99];
+  assert.deepEqual(
+    selectPaperQuestions(sampleQuestions, progress, 2, 'weighted', () => weightedRandomValues.shift()).map((question) => question.id),
+    [1, 2]
+  );
+  assert.equal(selectPaperQuestions(sampleQuestions, progress, 99, 'uniform').length, 3);
 });
 
 test('returns default stats for unseen questions', () => {

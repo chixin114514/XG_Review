@@ -79,3 +79,19 @@ test('practice toolbar can switch between weighted and uniform question picking'
   assert.match(html, /Core\.pickUniformQuestion\(usable\)/);
   assert.match(html, /Core\.pickWeightedQuestion\(usable, state\.progress\)/);
 });
+
+test('paper view supports filtered exam generation and hides answers until complete submission', () => {
+  assert.match(html, /data-view="paper"[^>]*>组卷<\/button>/);
+  assert.match(html, /id="paper-view"/);
+  assert.match(html, /id="paper-subject-filter"/);
+  assert.match(html, /id="paper-type-filter"/);
+  assert.match(html, /id="paper-weight-mode-filter"/);
+  assert.match(html, /id="paper-count"/);
+  assert.match(html, /id="generate-paper"/);
+  assert.match(html, /id="submit-paper"/);
+  assert.match(html, /function renderPaper\(\)/);
+  assert.match(html, /function submitPaper\(\)/);
+  assert.match(html, /Core\.selectPaperQuestions\(/);
+  assert.match(html, /if \(!isPaperComplete\(\)\)/);
+  assert.match(html, /if \(state\.paperSubmitted\) \{/);
+});
