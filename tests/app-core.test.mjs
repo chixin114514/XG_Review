@@ -12,6 +12,7 @@ import {
   buildWeightedPool,
   pickWeightedQuestion,
   rememberQuestion,
+  shuffleOptionEntries,
   takePreviousQuestion,
 } from '../src/app-core.mjs';
 
@@ -123,4 +124,14 @@ test('records and restores previous question history without duplicating current
   const empty = takePreviousQuestion(sampleQuestions, []);
   assert.equal(empty.question, null);
   assert.deepEqual(empty.history, []);
+});
+
+test('shuffles option entries while preserving original answer keys', () => {
+  const entries = Object.entries(sampleQuestions[0].options);
+  const randomValues = [0.1, 0.8, 0.3];
+  const shuffled = shuffleOptionEntries(entries, () => randomValues.shift());
+
+  assert.deepEqual(shuffled.map(([key]) => key), ['B', 'D', 'C', 'A']);
+  assert.deepEqual(Object.fromEntries(shuffled), sampleQuestions[0].options);
+  assert.deepEqual(entries.map(([key]) => key), ['A', 'B', 'C', 'D']);
 });

@@ -40,6 +40,15 @@ export function normalizeAnswer(answer) {
   return [...new Set(answer)].sort();
 }
 
+export function shuffleOptionEntries(entries, random = Math.random) {
+  const shuffled = entries.slice();
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
+}
+
 export function isCorrectAnswer(selected, correct) {
   const normalizedSelected = normalizeAnswer(selected);
   const normalizedCorrect = normalizeAnswer(correct);

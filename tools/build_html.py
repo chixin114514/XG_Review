@@ -203,7 +203,7 @@ def build_html() -> str:
 
     .toolbar {{
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 10px;
       padding: 14px;
       border-bottom: 1px solid var(--line);
@@ -224,6 +224,30 @@ def build_html() -> str:
       border-radius: 0;
       color: var(--ink);
       background: var(--paper-strong);
+    }}
+
+    .checkbox-field {{
+      display: flex;
+      align-items: end;
+      min-height: 62px;
+    }}
+
+    .checkbox-field label {{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 40px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      background: var(--paper-strong);
+      color: var(--ink);
+      font-weight: 700;
+    }}
+
+    .checkbox-field input {{
+      width: 18px;
+      height: 18px;
+      accent-color: var(--red);
     }}
 
     .toggle-line {{
@@ -600,6 +624,12 @@ def build_html() -> str:
               <option value="favorite">只刷收藏</option>
             </select>
           </div>
+          <div class="checkbox-field">
+            <label for="shuffle-options">
+              <input id="shuffle-options" type="checkbox">
+              打乱选项
+            </label>
+          </div>
           <div class="toggle-line">
             <button class="toggle-button" id="favorite-current" type="button">收藏本题</button>
           </div>
@@ -725,6 +755,7 @@ const elements = {{
   subjectFilter: document.getElementById('subject-filter'),
   typeFilter: document.getElementById('type-filter'),
   scopeFilter: document.getElementById('scope-filter'),
+  shuffleOptions: document.getElementById('shuffle-options'),
   wrongSubjectFilter: document.getElementById('wrong-subject-filter'),
   wrongTypeFilter: document.getElementById('wrong-type-filter'),
   wrongBookSummary: document.getElementById('wrong-book-summary'),
@@ -874,7 +905,7 @@ function renderQuestion() {{
   elements.options.innerHTML = '';
   renderQuestionMeta();
 
-  Object.entries(question.options).forEach(([key, value]) => {{
+  getDisplayOptionEntries(question).forEach(([key, value]) => {{
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'option';
@@ -883,6 +914,7 @@ function renderQuestion() {{
     button.addEventListener('click', () => toggleOption(key));
     elements.options.appendChild(button);
   }});
+  syncSelectedOptions();
 
   elements.feedback.textContent = type === 'multiple' ? '多选题需要选全，少选或多选都算错。' : '';
   elements.feedback.className = 'feedback';
@@ -890,6 +922,11 @@ function renderQuestion() {{
   renderGlobalStats();
   renderWrongBook();
   renderFavoriteBook();
+}}
+
+function getDisplayOptionEntries(question) {{
+  const entries = Object.entries(question.options);
+  return elements.shuffleOptions.checked ? Core.shuffleOptionEntries(entries) : entries;
 }}
 
 function renderQuestionMeta() {{
@@ -923,9 +960,18 @@ function toggleOption(key) {{
     state.selected = new Set([key]);
   }}
 
+  syncSelectedOptions();
+}}
+
+function syncSelectedOptions() {{
   [...elements.options.children].forEach((button) => {{
     button.classList.toggle('selected', state.selected.has(button.dataset.key));
   }});
+}}
+
+function reshuffleCurrentOptions() {{
+  if (!state.current || state.answered) return;
+  renderQuestion();
 }}
 
 function submitAnswer() {{
@@ -1183,6 +1229,7 @@ function resetProgress() {{
 elements.subjectFilter.addEventListener('change', chooseNextQuestion);
 elements.typeFilter.addEventListener('change', chooseNextQuestion);
 elements.scopeFilter.addEventListener('change', chooseNextQuestion);
+elements.shuffleOptions.addEventListener('change', reshuffleCurrentOptions);
 elements.wrongSubjectFilter.addEventListener('change', renderWrongBook);
 elements.wrongTypeFilter.addEventListener('change', renderWrongBook);
 elements.favoriteSubjectFilter.addEventListener('change', renderFavoriteBook);

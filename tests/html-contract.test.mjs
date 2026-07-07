@@ -58,3 +58,11 @@ test('favorite and mastered toggles do not reset submitted question state', () =
   assert.match(favoriteBody, /renderQuestionMeta\(\)/);
   assert.match(masteredBody, /renderQuestionMeta\(\)/);
 });
+
+test('practice toolbar can shuffle option order without changing answer keys', () => {
+  assert.match(html, /id="shuffle-options"/);
+  assert.match(html, /shuffleOptions: document\.getElementById\('shuffle-options'\),/);
+  assert.match(html, /function getDisplayOptionEntries\(question\)/);
+  assert.match(html, /Core\.shuffleOptionEntries\(entries\)/);
+  assert.match(html, /button\.dataset\.key = key;/);
+});
