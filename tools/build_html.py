@@ -42,6 +42,8 @@ const Core = (() => {{
     getQuestionTypeLabel,
     normalizeAnswer,
     shuffleOptionEntries,
+    shuffleOptionValues,
+    getDisplayedCorrectAnswer,
     isCorrectAnswer,
     canSubmitAnswer,
     getQuestionStats,
@@ -628,7 +630,7 @@ def build_html() -> str:
           <div class="checkbox-field">
             <label for="shuffle-options">
               <input id="shuffle-options" type="checkbox">
-              打乱选项
+              打乱内容
             </label>
           </div>
           <div class="toggle-line">
@@ -745,6 +747,7 @@ const state = {{
   current: null,
   history: [],
   selected: new Set(),
+  displayCorrectAnswer: [],
   answered: false,
 }};
 
@@ -858,6 +861,7 @@ function chooseNextQuestion() {{
   state.history = Core.rememberQuestion(state.history, previousId, nextQuestion.id);
   state.current = nextQuestion;
   state.selected = new Set();
+  state.displayCorrectAnswer = [];
   state.answered = false;
   renderQuestion();
 }}
@@ -873,6 +877,7 @@ function showPreviousQuestion() {{
   state.history = restored.history;
   state.current = restored.question;
   state.selected = new Set();
+  state.displayCorrectAnswer = [];
   state.answered = false;
   renderQuestion();
 }}
@@ -898,6 +903,8 @@ function renderEmptyState() {{
 function renderQuestion() {{
   const question = state.current;
   const type = Core.getQuestionType(question);
+  const displayEntries = getDisplayOptionEntries(question);
+  state.displayCorrectAnswer = Core.getDisplayedCorrectAnswer(displayEntries, question.correct_answer);
 
   elements.submitAnswer.disabled = false;
   elements.favoriteCurrent.disabled = false;
@@ -906,11 +913,12 @@ function renderQuestion() {{
   elements.options.innerHTML = '';
   renderQuestionMeta();
 
-  getDisplayOptionEntries(question).forEach(([key, value]) => {{
+  displayEntries.forEach(([key, value, originalKey]) => {{
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'option';
     button.dataset.key = key;
+    button.dataset.originalKey = originalKey;
     button.innerHTML = `<span class="option-key">${{key}}</span><span>${{value}}</span>`;
     button.addEventListener('click', () => toggleOption(key));
     elements.options.appendChild(button);
@@ -927,7 +935,9 @@ function renderQuestion() {{
 
 function getDisplayOptionEntries(question) {{
   const entries = Object.entries(question.options);
-  return elements.shuffleOptions.checked ? Core.shuffleOptionEntries(entries) : entries;
+  return elements.shuffleOptions.checked
+    ? Core.shuffleOptionValues(entries)
+    : entries.map(([key, value]) => [key, value, key]);
 }}
 
 function renderQuestionMeta() {{
@@ -990,7 +1000,10 @@ function submitAnswer() {{
   }}
 
   const selected = [...state.selected];
-  const wasCorrect = Core.isCorrectAnswer(selected, state.current.correct_answer);
+  const correctAnswer = state.displayCorrectAnswer.length
+    ? state.displayCorrectAnswer
+    : state.current.correct_answer;
+  const wasCorrect = Core.isCorrectAnswer(selected, correctAnswer);
   state.progress = Core.updateProgressAfterAnswer(state.progress, state.current.id, wasCorrect);
   state.today.count += 1;
   state.answered = true;
@@ -1000,11 +1013,11 @@ function submitAnswer() {{
   [...elements.options.children].forEach((button) => {{
     const key = button.dataset.key;
     button.disabled = true;
-    if (state.current.correct_answer.includes(key)) button.classList.add('correct');
-    if (state.selected.has(key) && !state.current.correct_answer.includes(key)) button.classList.add('wrong');
+    if (correctAnswer.includes(key)) button.classList.add('correct');
+    if (state.selected.has(key) && !correctAnswer.includes(key)) button.classList.add('wrong');
   }});
 
-  const correctText = Core.normalizeAnswer(state.current.correct_answer).join('、');
+  const correctText = Core.normalizeAnswer(correctAnswer).join('、');
   if (wasCorrect) {{
     elements.feedback.textContent = `正确。标准答案：${{correctText}}。`;
     elements.feedback.className = 'feedback good';
@@ -1142,6 +1155,7 @@ function openQuestionFromList(question) {{
   );
   state.current = question;
   state.selected = new Set();
+  state.displayCorrectAnswer = [];
   state.answered = false;
   switchView('practice');
   renderQuestion();

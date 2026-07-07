@@ -49,6 +49,24 @@ export function shuffleOptionEntries(entries, random = Math.random) {
   return shuffled;
 }
 
+export function shuffleOptionValues(entries, random = Math.random) {
+  const displayKeys = entries.map(([key]) => key);
+  const shuffledEntries = shuffleOptionEntries(entries, random);
+  return displayKeys.map((key, index) => [
+    key,
+    shuffledEntries[index][1],
+    shuffledEntries[index][0],
+  ]);
+}
+
+export function getDisplayedCorrectAnswer(displayEntries, correctAnswer) {
+  const correct = new Set(correctAnswer);
+  return displayEntries
+    .filter(([, , originalKey]) => correct.has(originalKey))
+    .map(([displayKey]) => displayKey)
+    .sort();
+}
+
 export function isCorrectAnswer(selected, correct) {
   const normalizedSelected = normalizeAnswer(selected);
   const normalizedCorrect = normalizeAnswer(correct);

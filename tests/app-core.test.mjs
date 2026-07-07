@@ -12,7 +12,8 @@ import {
   buildWeightedPool,
   pickWeightedQuestion,
   rememberQuestion,
-  shuffleOptionEntries,
+  getDisplayedCorrectAnswer,
+  shuffleOptionValues,
   takePreviousQuestion,
 } from '../src/app-core.mjs';
 
@@ -126,12 +127,25 @@ test('records and restores previous question history without duplicating current
   assert.deepEqual(empty.history, []);
 });
 
-test('shuffles option entries while preserving original answer keys', () => {
+test('shuffles option values while keeping visible option labels fixed', () => {
   const entries = Object.entries(sampleQuestions[0].options);
   const randomValues = [0.1, 0.8, 0.3];
-  const shuffled = shuffleOptionEntries(entries, () => randomValues.shift());
+  const displayed = shuffleOptionValues(entries, () => randomValues.shift());
 
-  assert.deepEqual(shuffled.map(([key]) => key), ['B', 'D', 'C', 'A']);
-  assert.deepEqual(Object.fromEntries(shuffled), sampleQuestions[0].options);
+  assert.deepEqual(displayed.map(([key]) => key), ['A', 'B', 'C', 'D']);
+  assert.deepEqual(displayed.map(([, value]) => value), ['二', '四', '三', '一']);
+  assert.deepEqual(displayed.map(([, , originalKey]) => originalKey), ['B', 'D', 'C', 'A']);
   assert.deepEqual(entries.map(([key]) => key), ['A', 'B', 'C', 'D']);
+});
+
+test('remaps correct answers to the displayed label after option values move', () => {
+  const displayed = [
+    ['A', '二', 'B'],
+    ['B', '四', 'D'],
+    ['C', '三', 'C'],
+    ['D', '一', 'A'],
+  ];
+
+  assert.deepEqual(getDisplayedCorrectAnswer(displayed, ['A']), ['D']);
+  assert.deepEqual(getDisplayedCorrectAnswer(displayed, ['A', 'C']), ['C', 'D']);
 });
