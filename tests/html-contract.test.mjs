@@ -86,6 +86,27 @@ test('practice notes are locked until the current question is answered', () => {
   assert.match(html, /elements\.questionNote\.addEventListener\('input', saveQuestionNote\);/);
 });
 
+test('progress import and export use a complete backup with merge support', () => {
+  assert.match(html, /id="import-mode"/);
+  assert.match(html, /<option value="merge">合并导入<\/option>/);
+  assert.match(html, /<option value="replace">覆盖导入<\/option>/);
+  assert.match(html, /id="storage-status"/);
+  assert.match(html, /version: 2,/);
+  assert.match(html, /customSeries: state\.customSeries,/);
+  assert.match(html, /seriesAdditions: state\.seriesAdditions,/);
+  assert.match(html, /today: state\.today,/);
+  assert.match(html, /function normalizeBackupPayload\(payload\)/);
+  assert.match(html, /function mergeProgress\(currentProgress, incomingProgress\)/);
+  assert.match(html, /function mergeCustomSeries\(currentSeries, incomingSeries\)/);
+  assert.match(html, /function mergeSeriesAdditions\(currentAdditions, incomingAdditions\)/);
+  assert.match(html, /function applyBackup\(backup, mode\)/);
+  assert.match(html, /const mode = elements\.importMode\.value;/);
+  assert.match(html, /state\.customSeries = mode === 'replace'/);
+  assert.match(html, /saveCustomSeries\(\);/);
+  assert.match(html, /saveSeriesAdditions\(\);/);
+  assert.match(html, /saveToday\(\);/);
+});
+
 test('question bank is loaded from sibling files instead of embedded in index', () => {
   assert.doesNotMatch(html, /id="question-data"/);
   assert.doesNotMatch(html, /<script type="application\/json"/);

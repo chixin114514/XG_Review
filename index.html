@@ -653,6 +653,15 @@
       gap: 8px;
     }
 
+    .storage-row select {
+      width: 100%;
+      min-height: 40px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      background: var(--paper-strong);
+      color: var(--ink);
+    }
+
     .empty {
       margin: 0;
       color: var(--muted);
@@ -813,9 +822,14 @@
           <div class="storage-row">
             <button class="ghost-button" id="export-progress" type="button">导出</button>
             <button class="ghost-button" id="import-progress-button" type="button">导入</button>
+            <select id="import-mode" aria-label="导入模式">
+              <option value="merge">合并导入</option>
+              <option value="replace">覆盖导入</option>
+            </select>
             <button class="danger-button" id="reset-progress" type="button">重置</button>
             <input class="hidden" id="import-progress" type="file" accept="application/json">
           </div>
+          <p class="empty" id="storage-status">导出会包含进度、笔记、收藏和专题配置。</p>
         </section>
       </aside>
     </section>
@@ -1360,8 +1374,10 @@ const elements = {
   bankTotal: document.getElementById('bank-total'),
   exportProgress: document.getElementById('export-progress'),
   importProgressButton: document.getElementById('import-progress-button'),
+  importMode: document.getElementById('import-mode'),
   importProgress: document.getElementById('import-progress'),
   resetProgress: document.getElementById('reset-progress'),
+  storageStatus: document.getElementById('storage-status'),
 };
 
 function loadProgress() {
@@ -2538,9 +2554,12 @@ function toggleMastered() {
 
 function exportProgress() {
   const payload = {
+    version: 2,
     exportedAt: new Date().toISOString(),
     progress: state.progress,
     today: state.today,
+    customSeries: state.customSeries,
+    seriesAdditions: state.seriesAdditions,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -2549,6 +2568,98 @@ function exportProgress() {
   link.download = 'xi-mao-review-progress.json';
   link.click();
   URL.revokeObjectURL(url);
+  elements.storageStatus.textContent = '已导出完整备份。';
+}
+
+function normalizeBackupPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('invalid payload');
+  }
+
+  const progress = payload.progress && typeof payload.progress === 'object'
+    ? payload.progress
+    : payload;
+  return {
+    progress,
+    today: payload.today && typeof payload.today === 'object' ? payload.today : null,
+    customSeries: Array.isArray(payload.customSeries) ? payload.customSeries : [],
+    seriesAdditions: payload.seriesAdditions && typeof payload.seriesAdditions === 'object' ? payload.seriesAdditions : {},
+  };
+}
+
+function mergeProgress(currentProgress, incomingProgress) {
+  const merged = { ...currentProgress };
+  Object.entries(incomingProgress || {}).forEach(([id, incomingStats]) => {
+    if (!incomingStats || typeof incomingStats !== 'object') return;
+    const currentStats = Core.getQuestionStats(merged, id);
+    merged[id] = {
+      ...currentStats,
+      ...incomingStats,
+      seenCount: Math.max(currentStats.seenCount || 0, incomingStats.seenCount || 0),
+      correctCount: Math.max(currentStats.correctCount || 0, incomingStats.correctCount || 0),
+      wrongCount: Math.max(currentStats.wrongCount || 0, incomingStats.wrongCount || 0),
+      streak: Math.max(currentStats.streak || 0, incomingStats.streak || 0),
+      mastered: Boolean(currentStats.mastered || incomingStats.mastered),
+      favorite: Boolean(currentStats.favorite || incomingStats.favorite),
+      note: incomingStats.note || currentStats.note || '',
+      lastAnsweredAt: [currentStats.lastAnsweredAt, incomingStats.lastAnsweredAt].filter(Boolean).sort().pop() || null,
+    };
+  });
+  return merged;
+}
+
+function mergeCustomSeries(currentSeries, incomingSeries) {
+  const byName = new Map(currentSeries.map((series) => [series.name, series]));
+  incomingSeries.forEach((series) => {
+    if (!series || !series.name || !Array.isArray(series.questions)) return;
+    if (!byName.has(series.name)) {
+      byName.set(series.name, normalizeCustomSeries(series));
+      return;
+    }
+    const current = byName.get(series.name);
+    const existingKeys = new Set(current.questions.map((question) => `${question.category}::${question.question}`));
+    const additions = series.questions
+      .filter((question) => question && question.question && !existingKeys.has(`${question.category}::${question.question}`))
+      .map((question, index) => cloneQuestionForSeries(question, series.name, current.questions.length + index));
+    byName.set(series.name, { ...current, questions: [...current.questions, ...additions] });
+  });
+  return [...byName.values()].filter(Boolean);
+}
+
+function mergeSeriesAdditions(currentAdditions, incomingAdditions) {
+  const merged = { ...currentAdditions };
+  Object.entries(incomingAdditions || {}).forEach(([seriesName, questionsForSeries]) => {
+    if (!Array.isArray(questionsForSeries)) return;
+    const currentQuestions = merged[seriesName] || [];
+    const existingKeys = new Set(currentQuestions.map((question) => `${question.category}::${question.question}`));
+    const additions = questionsForSeries
+      .filter((question) => question && question.question && !existingKeys.has(`${question.category}::${question.question}`))
+      .map((question, index) => cloneQuestionForSeries(question, seriesName, currentQuestions.length + index));
+    merged[seriesName] = [...currentQuestions, ...additions];
+  });
+  return merged;
+}
+
+function applyBackup(backup, mode) {
+  state.progress = mode === 'replace'
+    ? backup.progress
+    : mergeProgress(state.progress, backup.progress);
+  state.today = mode === 'replace' && backup.today ? backup.today : state.today;
+  state.customSeries = mode === 'replace'
+    ? backup.customSeries.map(normalizeCustomSeries).filter(Boolean)
+    : mergeCustomSeries(state.customSeries, backup.customSeries);
+  state.seriesAdditions = mode === 'replace'
+    ? backup.seriesAdditions
+    : mergeSeriesAdditions(state.seriesAdditions, backup.seriesAdditions);
+  state.history = [];
+  saveProgress();
+  saveToday();
+  saveCustomSeries();
+  saveSeriesAdditions();
+  populateSeriesSelect();
+  populatePracticeSeriesSelect();
+  renderCustomSeriesDraft();
+  chooseNextQuestion();
 }
 
 function importProgress(file) {
@@ -2556,12 +2667,14 @@ function importProgress(file) {
   reader.onload = () => {
     try {
       const payload = JSON.parse(reader.result);
-      state.progress = payload.progress && typeof payload.progress === 'object' ? payload.progress : payload;
-      saveProgress();
-      chooseNextQuestion();
+      const backup = normalizeBackupPayload(payload);
+      const mode = elements.importMode.value;
+      applyBackup(backup, mode);
+      elements.storageStatus.textContent = mode === 'replace' ? '已覆盖导入完整备份。' : '已合并导入完整备份。';
     } catch {
       elements.feedback.textContent = '导入失败，文件不是有效的进度 JSON。';
       elements.feedback.className = 'feedback bad';
+      elements.storageStatus.textContent = '导入失败，文件格式不正确。';
     }
   };
   reader.readAsText(file);
