@@ -713,6 +713,11 @@ def build_html() -> str:
       font-weight: 800;
     }}
 
+    .answer-line {{
+      color: var(--green);
+      font-weight: 800;
+    }}
+
     .wrong-item button {{
       justify-self: start;
       min-height: 30px;
@@ -1956,6 +1961,14 @@ function renderQuestionOptionList(question) {{
     .join('');
 }}
 
+function renderQuestionAnswerLine(question) {{
+  const answerKeys = Core.normalizeAnswer(question.correct_answer || []).join('、') || '无';
+  const answerValues = Core.normalizeAnswer(question.correct_answer || [])
+    .map((key) => `${{key}}. ${{question.options?.[key] || ''}}`)
+    .join('；') || '无';
+  return `标准答案：${{answerKeys}}。答案内容：${{answerValues}}`;
+}}
+
 function renderCustomSeriesDraft(searchResults = null) {{
   elements.customSeriesSelectedList.innerHTML = '';
   elements.seriesSearchResults.innerHTML = '';
@@ -2278,6 +2291,7 @@ function renderQuestionSearchResults(results = state.questionSearchResults) {{
       </div>
       <p>${{question.question}}</p>
       <div class="compact-options">${{renderQuestionOptionList(question)}}</div>
+      <p class="answer-line">${{renderQuestionAnswerLine(question)}}</p>
     `;
     const practiceButton = document.createElement('button');
     practiceButton.type = 'button';
@@ -2361,6 +2375,7 @@ function renderWrongBook() {{
       </div>
       <p>${{item.question.question}}</p>
       <div class="compact-options">${{renderQuestionOptionList(item.question)}}</div>
+      <p class="answer-line">${{renderQuestionAnswerLine(item.question)}}</p>
     `;
     const practiceButton = document.createElement('button');
     practiceButton.type = 'button';
@@ -2425,6 +2440,7 @@ function renderFavoriteBook() {{
       </div>
       <p>${{item.question.question}}</p>
       <div class="compact-options">${{renderQuestionOptionList(item.question)}}</div>
+      <p class="answer-line">${{renderQuestionAnswerLine(item.question)}}</p>
     `;
     const practiceButton = document.createElement('button');
     practiceButton.type = 'button';

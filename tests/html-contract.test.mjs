@@ -45,6 +45,7 @@ test('wrong book and favorites show options, paginate, and support direct review
   assert.match(html, /id="favorite-next-page"/);
   assert.match(html, /id="favorite-page-status"/);
   assert.match(html, /<div class="compact-options">\$\{renderQuestionOptionList\(item\.question\)\}<\/div>/);
+  assert.match(html, /<p class="answer-line">\$\{renderQuestionAnswerLine\(item\.question\)\}<\/p>/);
   assert.match(html, /function startScopedReview\(scope\)/);
   assert.match(html, /function removeWrongQuestion\(questionId\)/);
   assert.match(html, /function removeFavoriteQuestion\(questionId\)/);
@@ -112,8 +113,18 @@ test('search view can find questions and add results into a series', () => {
   assert.match(html, /function runQuestionSearch\(\)/);
   assert.match(html, /Core\.searchQuestionBank\(questions, elements\.questionSearchQuery\.value, 80\)/);
   assert.match(html, /<div class="compact-options">\$\{renderQuestionOptionList\(question\)\}<\/div>/);
+  assert.match(html, /<p class="answer-line">\$\{renderQuestionAnswerLine\(question\)\}<\/p>/);
   assert.match(html, /appendSeriesAddControls\(row, question\);/);
   assert.match(html, /if \(isSearch\) renderQuestionSearchResults\(\);/);
+});
+
+test('search, wrong book, and favorites show correct answers in list views', () => {
+  assert.match(html, /function renderQuestionAnswerLine\(question\)/);
+  assert.match(html, /标准答案：\$\{answerKeys\}/);
+  assert.match(html, /答案内容：\$\{answerValues\}/);
+  assert.match(html, /renderQuestionSearchResults[\s\S]*?<p class="answer-line">\$\{renderQuestionAnswerLine\(question\)\}<\/p>/);
+  assert.match(html, /renderWrongBook[\s\S]*?<p class="answer-line">\$\{renderQuestionAnswerLine\(item\.question\)\}<\/p>/);
+  assert.match(html, /renderFavoriteBook[\s\S]*?<p class="answer-line">\$\{renderQuestionAnswerLine\(item\.question\)\}<\/p>/);
 });
 
 test('progress import and export use a complete backup with merge support', () => {
