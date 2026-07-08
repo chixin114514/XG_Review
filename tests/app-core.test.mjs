@@ -14,6 +14,7 @@ import {
   pickWeightedQuestion,
   rememberQuestion,
   selectPaperQuestions,
+  searchQuestionBank,
   getDisplayedCorrectAnswer,
   shuffleOptionValues,
   takePreviousQuestion,
@@ -128,6 +129,13 @@ test('selects paper questions without replacement using the requested mode', () 
     [1, 2]
   );
   assert.equal(selectPaperQuestions(sampleQuestions, progress, 99, 'uniform').length, 3);
+});
+
+test('searches question bank text and option values for custom series building', () => {
+  assert.deepEqual(searchQuestionBank(sampleQuestions, '多选').map((question) => question.id), [1]);
+  assert.deepEqual(searchQuestionBank(sampleQuestions, 'true').map((question) => question.id), [2]);
+  assert.deepEqual(searchQuestionBank(sampleQuestions, '三', 1).map((question) => question.id), [0]);
+  assert.deepEqual(searchQuestionBank(sampleQuestions, '   '), []);
 });
 
 test('returns default stats for unseen questions', () => {

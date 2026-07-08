@@ -118,3 +118,18 @@ test('series review view loads same-series data and does not write global progre
   assert.doesNotMatch(submitSeriesBody, /state\.today\.count/);
   assert.doesNotMatch(submitSeriesBody, /saveProgress\(\)/);
 });
+
+test('series view can build custom series from question bank search', () => {
+  assert.match(html, /id="custom-series-name"/);
+  assert.match(html, /id="series-search-query"/);
+  assert.match(html, /id="series-search-button"/);
+  assert.match(html, /id="series-search-results"/);
+  assert.match(html, /id="custom-series-selected-list"/);
+  assert.match(html, /id="save-custom-series"/);
+  assert.match(html, /CUSTOM_SERIES_KEY/);
+  assert.match(html, /function loadCustomSeries\(\)/);
+  assert.match(html, /function getAllSeries\(\)/);
+  assert.match(html, /function searchSeriesQuestions\(\)/);
+  assert.match(html, /function saveCustomSeriesDraft\(\)/);
+  assert.match(html, /Core\.searchQuestionBank\(questions, elements\.seriesSearchQuery\.value/);
+});

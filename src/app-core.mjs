@@ -158,6 +158,21 @@ export function selectPaperQuestions(
   return selected;
 }
 
+export function searchQuestionBank(questions, query, limit = 30) {
+  const keyword = String(query || '').trim().toLowerCase();
+  if (!keyword) return [];
+
+  return questions
+    .filter((question) => {
+      const haystack = [
+        question.question,
+        ...Object.values(question.options || {}),
+      ].join('\n').toLowerCase();
+      return haystack.includes(keyword);
+    })
+    .slice(0, Math.max(0, Number(limit) || 0));
+}
+
 export function rememberQuestion(history, currentId, nextId, maxLength = 100) {
   if (currentId === null || currentId === undefined || currentId === nextId) {
     return history;

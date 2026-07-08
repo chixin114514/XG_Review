@@ -67,6 +67,7 @@ const Core = (() => {{
     pickUniformQuestion,
     pickWeightedQuestion,
     selectPaperQuestions,
+    searchQuestionBank,
     rememberQuestion,
     takePreviousQuestion,
     updateProgressAfterAnswer,
@@ -565,6 +566,50 @@ def build_html() -> str:
       padding: 22px;
     }}
 
+    .series-builder {{
+      display: grid;
+      gap: 12px;
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(248, 243, 231, 0.42);
+    }}
+
+    .series-builder-grid {{
+      display: grid;
+      grid-template-columns: minmax(160px, 0.8fr) minmax(240px, 1.4fr) auto;
+      gap: 10px;
+      align-items: end;
+    }}
+
+    .series-builder-lists {{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }}
+
+    .series-list-panel {{
+      display: grid;
+      gap: 8px;
+      align-content: start;
+      min-height: 112px;
+      padding: 10px;
+      border: 1px solid rgba(216, 205, 187, 0.9);
+      background: rgba(255, 250, 240, 0.72);
+    }}
+
+    .series-list-panel h3 {{
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.2;
+    }}
+
+    .series-search-results,
+    .custom-series-selected-list {{
+      display: grid;
+      gap: 8px;
+    }}
+
     .wrong-item {{
       display: grid;
       gap: 6px;
@@ -621,6 +666,8 @@ def build_html() -> str:
       .stats-strip,
       .toolbar,
       .paper-controls,
+      .series-builder-grid,
+      .series-builder-lists,
       .series-controls,
       .wrong-filters {{
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -636,6 +683,8 @@ def build_html() -> str:
       .stats-strip,
       .toolbar,
       .paper-controls,
+      .series-builder-grid,
+      .series-builder-lists,
       .series-controls,
       .wrong-filters,
       .storage-row {{
@@ -775,6 +824,33 @@ def build_html() -> str:
         </div>
         <button class="primary-button" id="start-series" type="button">开始专题</button>
       </div>
+      <section class="series-builder" aria-label="自定义系列">
+        <div class="series-builder-grid">
+          <div class="field">
+            <label for="custom-series-name">自定义系列名</label>
+            <input id="custom-series-name" type="text" placeholder="例如：六个必须坚持">
+          </div>
+          <div class="field">
+            <label for="series-search-query">搜索题库</label>
+            <input id="series-search-query" type="search" placeholder="输入题干或选项关键词">
+          </div>
+          <div class="paper-actions">
+            <button class="ghost-button" id="series-search-button" type="button">搜索</button>
+            <button class="primary-button" id="save-custom-series" type="button">保存系列</button>
+          </div>
+        </div>
+        <p class="empty" id="custom-series-status">搜索题库后，把相似题加入自定义系列。</p>
+        <div class="series-builder-lists">
+          <div class="series-list-panel">
+            <h3>搜索结果</h3>
+            <div class="series-search-results" id="series-search-results"></div>
+          </div>
+          <div class="series-list-panel">
+            <h3>已选题目</h3>
+            <div class="custom-series-selected-list" id="custom-series-selected-list"></div>
+          </div>
+        </div>
+      </section>
       <div class="series-question-area">
         <div class="meta-row" id="series-meta-row"></div>
         <h2 class="question-text" id="series-question-text">请选择系列。</h2>
@@ -897,6 +973,7 @@ def build_html() -> str:
 
 const STORAGE_KEY = 'xi-mao-review-progress-v1';
 const TODAY_KEY = 'xi-mao-review-today-v1';
+const CUSTOM_SERIES_KEY = 'xi-mao-review-custom-series-v1';
 const questions = (window.QUESTION_BANK || []).map((question, index) => ({{
   ...question,
   id: index,
@@ -929,6 +1006,8 @@ const state = {{
   seriesSelected: new Set(),
   seriesAnswered: false,
   seriesDisplayCorrectAnswer: [],
+  customSeries: loadCustomSeries(),
+  customSeriesDraft: [],
 }};
 
 const elements = {{
@@ -961,6 +1040,13 @@ const elements = {{
   seriesSubmitAnswer: document.getElementById('series-submit-answer'),
   seriesSkipQuestion: document.getElementById('series-skip-question'),
   seriesFeedback: document.getElementById('series-feedback'),
+  customSeriesName: document.getElementById('custom-series-name'),
+  seriesSearchQuery: document.getElementById('series-search-query'),
+  seriesSearchButton: document.getElementById('series-search-button'),
+  seriesSearchResults: document.getElementById('series-search-results'),
+  customSeriesSelectedList: document.getElementById('custom-series-selected-list'),
+  saveCustomSeries: document.getElementById('save-custom-series'),
+  customSeriesStatus: document.getElementById('custom-series-status'),
   wrongSubjectFilter: document.getElementById('wrong-subject-filter'),
   wrongTypeFilter: document.getElementById('wrong-type-filter'),
   wrongBookSummary: document.getElementById('wrong-book-summary'),
@@ -1014,6 +1100,37 @@ function loadToday() {{
 
 function saveToday() {{
   localStorage.setItem(TODAY_KEY, JSON.stringify(state.today));
+}}
+
+function normalizeCustomSeries(rawSeries) {{
+  if (!rawSeries || !Array.isArray(rawSeries.questions)) return null;
+  const name = String(rawSeries.name || `CUSTOM_${{Date.now()}}`);
+  const title = String(rawSeries.title || name);
+  const questions = rawSeries.questions
+    .filter((question) => question && question.question && question.options)
+    .map((question, questionIndex) => ({{
+      category: question.category,
+      question: question.question,
+      options: question.options,
+      correct_answer: question.correct_answer || [],
+      id: `${{name}}-${{questionIndex}}`,
+    }}));
+
+  if (!questions.length) return null;
+  return {{ name, title, custom: true, questions }};
+}}
+
+function loadCustomSeries() {{
+  try {{
+    const raw = JSON.parse(localStorage.getItem(CUSTOM_SERIES_KEY)) || [];
+    return raw.map(normalizeCustomSeries).filter(Boolean);
+  }} catch {{
+    return [];
+  }}
+}}
+
+function saveCustomSeries() {{
+  localStorage.setItem(CUSTOM_SERIES_KEY, JSON.stringify(state.customSeries));
 }}
 
 function switchView(view) {{
@@ -1422,8 +1539,10 @@ function submitPaper() {{
 }}
 
 function populateSeriesSelect() {{
+  const allSeries = getAllSeries();
+  const previousValue = elements.seriesSelect.value;
   elements.seriesSelect.innerHTML = '';
-  if (!seriesBank.length) {{
+  if (!allSeries.length) {{
     const option = document.createElement('option');
     option.value = '';
     option.textContent = '没有专题数据';
@@ -1432,16 +1551,146 @@ function populateSeriesSelect() {{
     return;
   }}
 
-  seriesBank.forEach((series) => {{
+  elements.startSeries.disabled = false;
+  allSeries.forEach((series) => {{
     const option = document.createElement('option');
     option.value = series.name;
-    option.textContent = `${{series.name}}（${{series.questions.length}} 题）`;
+    const label = series.custom ? `自定义：${{series.title}}` : series.name;
+    option.textContent = `${{label}}（${{series.questions.length}} 题）`;
     elements.seriesSelect.appendChild(option);
   }});
+  if (previousValue && allSeries.some((series) => series.name === previousValue)) {{
+    elements.seriesSelect.value = previousValue;
+  }}
 }}
 
 function getSelectedSeries() {{
-  return seriesBank.find((series) => series.name === elements.seriesSelect.value) || null;
+  return getAllSeries().find((series) => series.name === elements.seriesSelect.value) || null;
+}}
+
+function getAllSeries() {{
+  return [...seriesBank, ...state.customSeries];
+}}
+
+function renderCustomSeriesDraft(searchResults = null) {{
+  elements.customSeriesSelectedList.innerHTML = '';
+  elements.seriesSearchResults.innerHTML = '';
+
+  const selectedIds = new Set(state.customSeriesDraft.map((question) => question.id));
+  const results = Array.isArray(searchResults) ? searchResults : [];
+  if (results.length) {{
+    results.forEach((question) => {{
+      const item = document.createElement('div');
+      item.className = 'wrong-item';
+      const type = Core.getQuestionType(question);
+      const buttonLabel = selectedIds.has(question.id) ? '已加入' : '加入';
+      item.innerHTML = `
+        <div class="wrong-item-meta">
+          <span class="pill subject">${{Core.getSubjectLabel(question.category)}}</span>
+          <span class="pill">${{Core.getQuestionTypeLabel(type)}}</span>
+        </div>
+        <p>${{question.question}}</p>
+      `;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = buttonLabel;
+      button.disabled = selectedIds.has(question.id);
+      button.addEventListener('click', () => addQuestionToCustomSeries(question.id));
+      item.appendChild(button);
+      elements.seriesSearchResults.appendChild(item);
+    }});
+  }} else {{
+    elements.seriesSearchResults.innerHTML = '<p class="empty">输入关键词后搜索题库。</p>';
+  }}
+
+  if (!state.customSeriesDraft.length) {{
+    elements.customSeriesSelectedList.innerHTML = '<p class="empty">还没有加入题目。</p>';
+  }} else {{
+    state.customSeriesDraft.forEach((question, index) => {{
+      const item = document.createElement('div');
+      item.className = 'wrong-item';
+      const type = Core.getQuestionType(question);
+      item.innerHTML = `
+        <div class="wrong-item-meta">
+          <span class="pill">${{index + 1}}</span>
+          <span class="pill subject">${{Core.getSubjectLabel(question.category)}}</span>
+          <span class="pill">${{Core.getQuestionTypeLabel(type)}}</span>
+        </div>
+        <p>${{question.question}}</p>
+      `;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = '移除';
+      button.addEventListener('click', () => removeQuestionFromCustomSeries(question.id));
+      item.appendChild(button);
+      elements.customSeriesSelectedList.appendChild(item);
+    }});
+  }}
+
+  elements.customSeriesStatus.textContent = `当前已选 ${{state.customSeriesDraft.length}} 题。`;
+}}
+
+function searchSeriesQuestions() {{
+  const results = Core.searchQuestionBank(questions, elements.seriesSearchQuery.value, 30);
+  renderCustomSeriesDraft(results);
+  elements.customSeriesStatus.textContent = results.length
+    ? `找到 ${{results.length}} 道候选题，点击加入后再保存系列。`
+    : '没有匹配题目，换一个关键词。';
+}}
+
+function addQuestionToCustomSeries(questionId) {{
+  const question = questions.find((item) => item.id === Number(questionId));
+  if (!question) return;
+  if (state.customSeriesDraft.some((item) => item.id === question.id)) {{
+    renderCustomSeriesDraft(Core.searchQuestionBank(questions, elements.seriesSearchQuery.value, 30));
+    return;
+  }}
+
+  state.customSeriesDraft = [...state.customSeriesDraft, question];
+  renderCustomSeriesDraft(Core.searchQuestionBank(questions, elements.seriesSearchQuery.value, 30));
+}}
+
+function removeQuestionFromCustomSeries(questionId) {{
+  state.customSeriesDraft = state.customSeriesDraft.filter((question) => question.id !== Number(questionId));
+  renderCustomSeriesDraft(Core.searchQuestionBank(questions, elements.seriesSearchQuery.value, 30));
+}}
+
+function saveCustomSeriesDraft() {{
+  const title = elements.customSeriesName.value.trim();
+  if (!title) {{
+    elements.customSeriesStatus.textContent = '先填写自定义系列名。';
+    return;
+  }}
+  if (!state.customSeriesDraft.length) {{
+    elements.customSeriesStatus.textContent = '至少加入一道题才能保存系列。';
+    return;
+  }}
+
+  const name = `CUSTOM_${{Date.now()}}`;
+  const savedSeries = {{
+    name,
+    title,
+    custom: true,
+    questions: state.customSeriesDraft.map((question, questionIndex) => ({{
+      category: question.category,
+      question: question.question,
+      options: question.options,
+      correct_answer: question.correct_answer || [],
+      id: `${{name}}-${{questionIndex}}`,
+    }})),
+  }};
+
+  state.customSeries = [...state.customSeries, savedSeries];
+  state.customSeriesDraft = [];
+  elements.customSeriesName.value = '';
+  saveCustomSeries();
+  populateSeriesSelect();
+  elements.seriesSelect.value = name;
+  state.seriesCurrent = null;
+  state.seriesQuestions = [];
+  renderCustomSeriesDraft();
+  renderSeriesQuestion();
+  elements.customSeriesStatus.textContent = `已保存自定义系列：${{title}}。`;
 }}
 
 function startSeriesReview() {{
@@ -1480,7 +1729,7 @@ function getSeriesDisplayOptionEntries(question) {{
 
 function renderSeriesQuestion() {{
   const series = getSelectedSeries();
-  if (!seriesBank.length) {{
+  if (!getAllSeries().length) {{
     elements.seriesSummary.textContent = '没有专题数据。';
     elements.seriesMetaRow.innerHTML = '';
     elements.seriesQuestionText.textContent = '未找到同系列专题文件。';
@@ -1493,7 +1742,7 @@ function renderSeriesQuestion() {{
 
   if (!state.seriesCurrent) {{
     elements.seriesSummary.textContent = series
-      ? `${{series.name}}，共 ${{series.questions.length}} 题。`
+      ? `${{series.custom ? `自定义：${{series.title}}` : series.name}}，共 ${{series.questions.length}} 题。`
       : '选择一个同系列专题开始复习。';
     elements.seriesMetaRow.innerHTML = '';
     elements.seriesQuestionText.textContent = '请选择系列后开始专题。';
@@ -1509,7 +1758,8 @@ function renderSeriesQuestion() {{
   const displayEntries = getSeriesDisplayOptionEntries(question);
   state.seriesDisplayCorrectAnswer = Core.getDisplayedCorrectAnswer(displayEntries, question.correct_answer);
   const type = Core.getQuestionType(question);
-  elements.seriesSummary.textContent = `${{elements.seriesSelect.value}}，专题复习不计入全局统计。`;
+  const seriesLabel = series ? (series.custom ? `自定义：${{series.title}}` : series.name) : elements.seriesSelect.value;
+  elements.seriesSummary.textContent = `${{seriesLabel}}，专题复习不计入全局统计。`;
   elements.seriesMetaRow.innerHTML = [
     `<span class="pill subject">${{Core.getSubjectLabel(question.category)}}</span>`,
     `<span class="pill type-badge">${{Core.getQuestionTypeLabel(type)}}</span>`,
@@ -1790,6 +2040,11 @@ elements.seriesSelect.addEventListener('change', () => {{
 elements.seriesShuffleOptions.addEventListener('change', reshuffleSeriesQuestion);
 elements.seriesSubmitAnswer.addEventListener('click', submitSeriesAnswer);
 elements.seriesSkipQuestion.addEventListener('click', chooseNextSeriesQuestion);
+elements.seriesSearchButton.addEventListener('click', searchSeriesQuestions);
+elements.seriesSearchQuery.addEventListener('keydown', (event) => {{
+  if (event.key === 'Enter') searchSeriesQuestions();
+}});
+elements.saveCustomSeries.addEventListener('click', saveCustomSeriesDraft);
 elements.wrongSubjectFilter.addEventListener('change', renderWrongBook);
 elements.wrongTypeFilter.addEventListener('change', renderWrongBook);
 elements.favoriteSubjectFilter.addEventListener('change', renderFavoriteBook);
@@ -1812,8 +2067,9 @@ elements.importProgress.addEventListener('change', (event) => {{
 elements.resetProgress.addEventListener('click', resetProgress);
 
 populateSeriesSelect();
+renderCustomSeriesDraft();
 chooseNextQuestion();
-  </script>
+</script>
 </body>
 </html>
 """
