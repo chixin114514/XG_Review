@@ -129,7 +129,9 @@ test('series view can build custom series from question bank search', () => {
   assert.match(html, /CUSTOM_SERIES_KEY/);
   assert.match(html, /function loadCustomSeries\(\)/);
   assert.match(html, /function getAllSeries\(\)/);
+  assert.match(html, /function renderQuestionOptionList\(question\)/);
   assert.match(html, /function searchSeriesQuestions\(\)/);
   assert.match(html, /function saveCustomSeriesDraft\(\)/);
+  assert.match(html, /<div class="compact-options">\$\{renderQuestionOptionList\(question\)\}<\/div>/);
   assert.match(html, /Core\.searchQuestionBank\(questions, elements\.seriesSearchQuery\.value/);
 });

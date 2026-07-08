@@ -624,6 +624,27 @@ def build_html() -> str:
       line-height: 1.45;
     }}
 
+    .compact-options {{
+      display: grid;
+      gap: 4px;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }}
+
+    .compact-option {{
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr);
+      gap: 6px;
+      align-items: start;
+    }}
+
+    .compact-option-key {{
+      color: var(--red-dark);
+      font-weight: 800;
+    }}
+
     .wrong-item button {{
       justify-self: start;
       min-height: 30px;
@@ -1572,6 +1593,17 @@ function getAllSeries() {{
   return [...seriesBank, ...state.customSeries];
 }}
 
+function renderQuestionOptionList(question) {{
+  return Object.entries(question.options || {{}})
+    .map(([key, value]) => `
+      <div class="compact-option">
+        <span class="compact-option-key">${{key}}</span>
+        <span>${{value}}</span>
+      </div>
+    `)
+    .join('');
+}}
+
 function renderCustomSeriesDraft(searchResults = null) {{
   elements.customSeriesSelectedList.innerHTML = '';
   elements.seriesSearchResults.innerHTML = '';
@@ -1590,6 +1622,7 @@ function renderCustomSeriesDraft(searchResults = null) {{
           <span class="pill">${{Core.getQuestionTypeLabel(type)}}</span>
         </div>
         <p>${{question.question}}</p>
+        <div class="compact-options">${{renderQuestionOptionList(question)}}</div>
       `;
       const button = document.createElement('button');
       button.type = 'button';
@@ -1617,6 +1650,7 @@ function renderCustomSeriesDraft(searchResults = null) {{
           <span class="pill">${{Core.getQuestionTypeLabel(type)}}</span>
         </div>
         <p>${{question.question}}</p>
+        <div class="compact-options">${{renderQuestionOptionList(question)}}</div>
       `;
       const button = document.createElement('button');
       button.type = 'button';
