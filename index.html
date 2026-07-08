@@ -1712,20 +1712,20 @@ function renderQuestionNote() {
   }
 
   const stats = Core.getQuestionStats(state.progress, state.current.id);
-  elements.questionNoteBox.classList.toggle('note-revealed', state.answered && state.noteRevealed);
+  elements.questionNoteBox.classList.toggle('note-revealed', state.answered || state.noteRevealed);
   elements.questionNote.disabled = !state.answered;
-  elements.questionNote.value = state.answered && state.noteRevealed ? stats.note || '' : '';
+  elements.questionNote.value = (state.answered || state.noteRevealed) ? stats.note || '' : '';
   elements.noteStatus.textContent = state.answered
-    ? '双击“笔记”标题或本卡片空白处查看和修改笔记。'
-    : '提交答案后才能查看或修改笔记。';
+    ? '可编辑当前题笔记。'
+    : state.noteRevealed
+      ? '已显示笔记，提交答案后才能修改。'
+      : '双击“笔记”标题或本卡片空白处查看笔记。';
 }
 
 function revealQuestionNote() {
-  if (!state.answered) return;
   state.noteRevealed = true;
   renderQuestionNote();
-  elements.questionNote.focus();
-  elements.noteStatus.textContent = '已显示当前题笔记。';
+  if (state.answered) elements.questionNote.focus();
 }
 
 function toggleOption(key) {
@@ -1775,6 +1775,7 @@ function submitAnswer() {
   state.progress = Core.updateProgressAfterAnswer(state.progress, state.current.id, wasCorrect);
   state.today.count += 1;
   state.answered = true;
+  state.noteRevealed = true;
   saveProgress();
   saveToday();
 
@@ -1811,7 +1812,7 @@ function renderCurrentStats() {
 }
 
 function saveQuestionNote() {
-  if (!state.current || !state.answered || !state.noteRevealed) return;
+  if (!state.current || !state.answered) return;
   const id = String(state.current.id);
   const stats = Core.getQuestionStats(state.progress, id);
   state.progress = {

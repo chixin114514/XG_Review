@@ -73,7 +73,7 @@ test('wrong book and favorites can add questions into a series review set', () =
   assert.match(html, /saveCustomSeries\(\);[\s\S]*?saveSeriesAdditions\(\);/);
 });
 
-test('practice notes are locked until the current question is answered', () => {
+test('practice notes can be revealed before answering and edited after answering', () => {
   assert.match(html, /id="note-status"/);
   assert.match(html, /id="question-note"/);
   assert.match(html, /id="question-note-box"/);
@@ -87,13 +87,16 @@ test('practice notes are locked until the current question is answered', () => {
   assert.match(html, /noteRevealed: false,/);
   assert.match(html, /state\.noteRevealed = false;/);
   assert.match(html, /state\.noteRevealed = true;/);
-  assert.match(html, /elements\.questionNote\.value = state\.answered && state\.noteRevealed \? stats\.note \|\| '' : '';/);
-  assert.match(html, /elements\.questionNoteBox\.classList\.toggle\('note-revealed', state\.answered && state\.noteRevealed\);/);
+  assert.match(html, /state\.noteRevealed = true;[\s\S]*?saveProgress\(\);/);
+  assert.match(html, /elements\.questionNote\.value = \(state\.answered \|\| state\.noteRevealed\) \? stats\.note \|\| '' : '';/);
+  assert.match(html, /elements\.questionNoteBox\.classList\.toggle\('note-revealed', state\.answered \|\| state\.noteRevealed\);/);
   assert.doesNotMatch(html, /elements\.questionNoteBox\.classList\.toggle\('note-revealed', state\.answered\);/);
-  assert.match(html, /if \(!state\.answered\) return;/);
   assert.match(html, /elements\.questionNoteBox\.addEventListener\('dblclick', revealQuestionNote\);/);
-  assert.match(html, /双击“笔记”标题或本卡片空白处查看和修改笔记。/);
+  assert.match(html, /已显示笔记，提交答案后才能修改。/);
+  assert.match(html, /可编辑当前题笔记。/);
+  assert.match(html, /双击“笔记”标题或本卡片空白处查看笔记。/);
   assert.match(html, /note: elements\.questionNote\.value,/);
+  assert.match(html, /if \(!state\.current \|\| !state\.answered\) return;/);
   assert.match(html, /elements\.questionNote\.addEventListener\('input', saveQuestionNote\);/);
 });
 
