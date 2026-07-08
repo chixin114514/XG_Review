@@ -513,6 +513,22 @@ def build_html() -> str:
       padding: 16px;
     }}
 
+    .list-actions {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: end;
+      align-items: end;
+    }}
+
+    .list-pager {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      padding: 0 16px 16px;
+    }}
+
     .paper-controls {{
       display: grid;
       grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -652,6 +668,11 @@ def build_html() -> str:
       border: 1px solid var(--line);
       background: #fffaf0;
       color: var(--ink);
+    }}
+
+    .wrong-item button.danger-button {{
+      border-color: rgba(166, 41, 34, 0.45);
+      color: var(--wrong);
     }}
 
     .wrong-item-meta {{
@@ -953,8 +974,16 @@ def build_html() -> str:
             </select>
           </div>
         </div>
+        <div class="list-actions">
+          <button class="primary-button" id="start-wrong-review" type="button">复习错题</button>
+        </div>
       </header>
       <div class="wrong-book-list" id="wrong-book-list"></div>
+      <div class="list-pager">
+        <button class="ghost-button" id="wrong-prev-page" type="button">上一页</button>
+        <span class="pill" id="wrong-page-status">第 1 页</span>
+        <button class="ghost-button" id="wrong-next-page" type="button">下一页</button>
+      </div>
     </section>
 
     <section class="app-view wrong-book-view hidden" id="favorite-view" aria-label="收藏">
@@ -982,8 +1011,16 @@ def build_html() -> str:
             </select>
           </div>
         </div>
+        <div class="list-actions">
+          <button class="primary-button" id="start-favorite-review" type="button">复习收藏</button>
+        </div>
       </header>
       <div class="wrong-book-list" id="favorite-list"></div>
+      <div class="list-pager">
+        <button class="ghost-button" id="favorite-prev-page" type="button">上一页</button>
+        <span class="pill" id="favorite-page-status">第 1 页</span>
+        <button class="ghost-button" id="favorite-next-page" type="button">下一页</button>
+      </div>
     </section>
   </main>
 
@@ -995,6 +1032,7 @@ def build_html() -> str:
 const STORAGE_KEY = 'xi-mao-review-progress-v1';
 const TODAY_KEY = 'xi-mao-review-today-v1';
 const CUSTOM_SERIES_KEY = 'xi-mao-review-custom-series-v1';
+const LIST_PAGE_SIZE = 20;
 const questions = (window.QUESTION_BANK || []).map((question, index) => ({{
   ...question,
   id: index,
@@ -1029,6 +1067,8 @@ const state = {{
   seriesDisplayCorrectAnswer: [],
   customSeries: loadCustomSeries(),
   customSeriesDraft: [],
+  wrongPage: 0,
+  favoritePage: 0,
 }};
 
 const elements = {{
@@ -1070,10 +1110,18 @@ const elements = {{
   customSeriesStatus: document.getElementById('custom-series-status'),
   wrongSubjectFilter: document.getElementById('wrong-subject-filter'),
   wrongTypeFilter: document.getElementById('wrong-type-filter'),
+  startWrongReview: document.getElementById('start-wrong-review'),
+  wrongPrevPage: document.getElementById('wrong-prev-page'),
+  wrongNextPage: document.getElementById('wrong-next-page'),
+  wrongPageStatus: document.getElementById('wrong-page-status'),
   wrongBookSummary: document.getElementById('wrong-book-summary'),
   wrongBookList: document.getElementById('wrong-book-list'),
   favoriteSubjectFilter: document.getElementById('favorite-subject-filter'),
   favoriteTypeFilter: document.getElementById('favorite-type-filter'),
+  startFavoriteReview: document.getElementById('start-favorite-review'),
+  favoritePrevPage: document.getElementById('favorite-prev-page'),
+  favoriteNextPage: document.getElementById('favorite-next-page'),
+  favoritePageStatus: document.getElementById('favorite-page-status'),
   favoriteSummary: document.getElementById('favorite-summary'),
   favoriteList: document.getElementById('favorite-list'),
   favoriteCurrent: document.getElementById('favorite-current'),
@@ -1876,6 +1924,13 @@ function submitSeriesAnswer() {{
   renderSeriesQuestion();
 }}
 
+function renderListPager(totalItems, currentPage, statusElement, prevButton, nextButton) {{
+  const totalPages = Math.max(1, Math.ceil(totalItems / LIST_PAGE_SIZE));
+  statusElement.textContent = `第 ${{currentPage + 1}} / ${{totalPages}} 页`;
+  prevButton.disabled = currentPage <= 0;
+  nextButton.disabled = currentPage >= totalPages - 1 || totalItems === 0;
+}}
+
 function renderWrongBook() {{
   const subject = elements.wrongSubjectFilter.value;
   const type = elements.wrongTypeFilter.value;
@@ -1896,11 +1951,20 @@ function renderWrongBook() {{
 
   if (!wrongItems.length) {{
     elements.wrongBookList.innerHTML = '<p class="empty">当前筛选下没有错题。</p>';
+    state.wrongPage = 0;
+    renderListPager(0, state.wrongPage, elements.wrongPageStatus, elements.wrongPrevPage, elements.wrongNextPage);
+    elements.startWrongReview.disabled = true;
     return;
   }}
 
+  const totalPages = Math.max(1, Math.ceil(wrongItems.length / LIST_PAGE_SIZE));
+  state.wrongPage = Math.min(state.wrongPage, totalPages - 1);
+  const start = state.wrongPage * LIST_PAGE_SIZE;
+  const pageItems = wrongItems.slice(start, start + LIST_PAGE_SIZE);
+  renderListPager(wrongItems.length, state.wrongPage, elements.wrongPageStatus, elements.wrongPrevPage, elements.wrongNextPage);
+  elements.startWrongReview.disabled = false;
   elements.wrongBookList.innerHTML = '';
-  wrongItems.forEach((item) => {{
+  pageItems.forEach((item) => {{
     const row = document.createElement('div');
     row.className = 'wrong-item';
     const questionType = Core.getQuestionType(item.question);
@@ -1913,9 +1977,19 @@ function renderWrongBook() {{
         <span class="pill">${{item.stats.mastered ? '已掌握' : '未掌握'}}</span>
       </div>
       <p>${{item.question.question}}</p>
-      <button type="button">练这题</button>
+      <div class="compact-options">${{renderQuestionOptionList(item.question)}}</div>
     `;
-    row.querySelector('button').addEventListener('click', () => openQuestionFromList(item.question));
+    const practiceButton = document.createElement('button');
+    practiceButton.type = 'button';
+    practiceButton.textContent = '练这题';
+    practiceButton.addEventListener('click', () => openQuestionFromList(item.question));
+    row.appendChild(practiceButton);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'danger-button';
+    button.textContent = '移出错题';
+    button.addEventListener('click', () => removeWrongQuestion(item.question.id));
+    row.appendChild(button);
     elements.wrongBookList.appendChild(row);
   }});
 }}
@@ -1940,11 +2014,20 @@ function renderFavoriteBook() {{
 
   if (!favoriteItems.length) {{
     elements.favoriteList.innerHTML = '<p class="empty">当前筛选下没有收藏题。</p>';
+    state.favoritePage = 0;
+    renderListPager(0, state.favoritePage, elements.favoritePageStatus, elements.favoritePrevPage, elements.favoriteNextPage);
+    elements.startFavoriteReview.disabled = true;
     return;
   }}
 
+  const totalPages = Math.max(1, Math.ceil(favoriteItems.length / LIST_PAGE_SIZE));
+  state.favoritePage = Math.min(state.favoritePage, totalPages - 1);
+  const start = state.favoritePage * LIST_PAGE_SIZE;
+  const pageItems = favoriteItems.slice(start, start + LIST_PAGE_SIZE);
+  renderListPager(favoriteItems.length, state.favoritePage, elements.favoritePageStatus, elements.favoritePrevPage, elements.favoriteNextPage);
+  elements.startFavoriteReview.disabled = false;
   elements.favoriteList.innerHTML = '';
-  favoriteItems.forEach((item) => {{
+  pageItems.forEach((item) => {{
     const row = document.createElement('div');
     row.className = 'wrong-item';
     const questionType = Core.getQuestionType(item.question);
@@ -1957,11 +2040,66 @@ function renderFavoriteBook() {{
         <span class="pill">${{item.stats.mastered ? '已掌握' : '未掌握'}}</span>
       </div>
       <p>${{item.question.question}}</p>
-      <button type="button">练这题</button>
+      <div class="compact-options">${{renderQuestionOptionList(item.question)}}</div>
     `;
-    row.querySelector('button').addEventListener('click', () => openQuestionFromList(item.question));
+    const practiceButton = document.createElement('button');
+    practiceButton.type = 'button';
+    practiceButton.textContent = '练这题';
+    practiceButton.addEventListener('click', () => openQuestionFromList(item.question));
+    row.appendChild(practiceButton);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'danger-button';
+    button.textContent = '取消收藏';
+    button.addEventListener('click', () => removeFavoriteQuestion(item.question.id));
+    row.appendChild(button);
     elements.favoriteList.appendChild(row);
   }});
+}}
+
+function startScopedReview(scope) {{
+  elements.scopeFilter.value = scope;
+  elements.subjectFilter.value = 'all';
+  elements.typeFilter.value = 'all';
+  switchView('practice');
+  chooseNextQuestion();
+  window.scrollTo({{ top: 0, behavior: 'smooth' }});
+}}
+
+function removeWrongQuestion(questionId) {{
+  const id = String(questionId);
+  const stats = Core.getQuestionStats(state.progress, id);
+  state.progress = {{
+    ...state.progress,
+    [id]: {{
+      ...stats,
+      wrongCount: 0,
+      streak: 0,
+      mastered: false,
+    }},
+  }};
+  saveProgress();
+  renderGlobalStats();
+  renderCurrentStats();
+  renderQuestionMeta();
+  renderWrongBook();
+  renderFavoriteBook();
+}}
+
+function removeFavoriteQuestion(questionId) {{
+  const id = String(questionId);
+  const stats = Core.getQuestionStats(state.progress, id);
+  state.progress = {{
+    ...state.progress,
+    [id]: {{
+      ...stats,
+      favorite: false,
+    }},
+  }};
+  saveProgress();
+  renderQuestionMeta();
+  renderWrongBook();
+  renderFavoriteBook();
 }}
 
 function openQuestionFromList(question) {{
@@ -2079,10 +2217,40 @@ elements.seriesSearchQuery.addEventListener('keydown', (event) => {{
   if (event.key === 'Enter') searchSeriesQuestions();
 }});
 elements.saveCustomSeries.addEventListener('click', saveCustomSeriesDraft);
-elements.wrongSubjectFilter.addEventListener('change', renderWrongBook);
-elements.wrongTypeFilter.addEventListener('change', renderWrongBook);
-elements.favoriteSubjectFilter.addEventListener('change', renderFavoriteBook);
-elements.favoriteTypeFilter.addEventListener('change', renderFavoriteBook);
+elements.wrongSubjectFilter.addEventListener('change', () => {{
+  state.wrongPage = 0;
+  renderWrongBook();
+}});
+elements.wrongTypeFilter.addEventListener('change', () => {{
+  state.wrongPage = 0;
+  renderWrongBook();
+}});
+elements.startWrongReview.addEventListener('click', () => startScopedReview('wrong'));
+elements.wrongPrevPage.addEventListener('click', () => {{
+  state.wrongPage = Math.max(0, state.wrongPage - 1);
+  renderWrongBook();
+}});
+elements.wrongNextPage.addEventListener('click', () => {{
+  state.wrongPage += 1;
+  renderWrongBook();
+}});
+elements.favoriteSubjectFilter.addEventListener('change', () => {{
+  state.favoritePage = 0;
+  renderFavoriteBook();
+}});
+elements.favoriteTypeFilter.addEventListener('change', () => {{
+  state.favoritePage = 0;
+  renderFavoriteBook();
+}});
+elements.startFavoriteReview.addEventListener('click', () => startScopedReview('favorite'));
+elements.favoritePrevPage.addEventListener('click', () => {{
+  state.favoritePage = Math.max(0, state.favoritePage - 1);
+  renderFavoriteBook();
+}});
+elements.favoriteNextPage.addEventListener('click', () => {{
+  state.favoritePage += 1;
+  renderFavoriteBook();
+}});
 elements.viewButtons.forEach((button) => {{
   button.addEventListener('click', () => switchView(button.dataset.view));
 }});

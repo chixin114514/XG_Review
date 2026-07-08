@@ -34,6 +34,26 @@ test('favorites are shown in a separate app view', () => {
   assert.match(html, /if \(isFavorite\) renderFavoriteBook\(\);/);
 });
 
+test('wrong book and favorites show options, paginate, and support direct review actions', () => {
+  assert.match(html, /const LIST_PAGE_SIZE = 20;/);
+  assert.match(html, /id="start-wrong-review"/);
+  assert.match(html, /id="wrong-prev-page"/);
+  assert.match(html, /id="wrong-next-page"/);
+  assert.match(html, /id="wrong-page-status"/);
+  assert.match(html, /id="start-favorite-review"/);
+  assert.match(html, /id="favorite-prev-page"/);
+  assert.match(html, /id="favorite-next-page"/);
+  assert.match(html, /id="favorite-page-status"/);
+  assert.match(html, /<div class="compact-options">\$\{renderQuestionOptionList\(item\.question\)\}<\/div>/);
+  assert.match(html, /function startScopedReview\(scope\)/);
+  assert.match(html, /function removeWrongQuestion\(questionId\)/);
+  assert.match(html, /function removeFavoriteQuestion\(questionId\)/);
+  assert.match(html, /wrongItems\.slice\(start, start \+ LIST_PAGE_SIZE\)/);
+  assert.match(html, /favoriteItems\.slice\(start, start \+ LIST_PAGE_SIZE\)/);
+  assert.match(html, /button\.className = 'danger-button';[\s\S]*?button\.textContent = '移出错题';/);
+  assert.match(html, /button\.className = 'danger-button';[\s\S]*?button\.textContent = '取消收藏';/);
+});
+
 test('question bank is loaded from sibling files instead of embedded in index', () => {
   assert.doesNotMatch(html, /id="question-data"/);
   assert.doesNotMatch(html, /<script type="application\/json"/);
