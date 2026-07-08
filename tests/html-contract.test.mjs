@@ -201,6 +201,19 @@ test('practice toolbar can switch between weighted and uniform question picking'
   assert.match(html, /Core\.pickWeightedQuestion\(usable, state\.progress\)/);
 });
 
+test('practice scope can target same-series review sets', () => {
+  assert.match(html, /function populatePracticeScopeSelect\(\)/);
+  assert.match(html, /function getSeriesScopeValue\(seriesName\)/);
+  assert.match(html, /return `series:\$\{seriesName\}`;/);
+  assert.match(html, /option\.textContent = `专题：\$\{label\}（\$\{series\.questions\.length\} 题）`;/);
+  assert.match(html, /elements\.scopeFilter\.appendChild\(option\);/);
+  assert.match(html, /if \(scope\.startsWith\('series:'\)\)/);
+  assert.match(html, /const selectedSeries = getSeriesByScopeValue\(scope\);/);
+  assert.match(html, /sourceQuestions = selectedSeries \? selectedSeries\.questions\.map\(normalizePracticeQuestion\) : \[\];/);
+  assert.match(html, /const candidates = getFilteredQuestions\(\);[\s\S]*?Core\.takePreviousQuestion\(candidates, state\.history\)/);
+  assert.match(html, /populatePracticeScopeSelect\(\);/);
+});
+
 test('paper view supports filtered exam generation and hides answers until complete submission', () => {
   assert.match(html, /data-view="paper"[^>]*>组卷<\/button>/);
   assert.match(html, /id="paper-view"/);

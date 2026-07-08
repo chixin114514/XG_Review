@@ -1402,8 +1402,14 @@ function getFilteredQuestions() {{
   const subject = elements.subjectFilter.value;
   const type = elements.typeFilter.value;
   const scope = elements.scopeFilter.value;
+  let sourceQuestions = questions;
 
-  return questions.filter((question) => {{
+  if (scope.startsWith('series:')) {{
+    const selectedSeries = getSeriesByScopeValue(scope);
+    sourceQuestions = selectedSeries ? selectedSeries.questions.map(normalizePracticeQuestion) : [];
+  }}
+
+  return sourceQuestions.filter((question) => {{
     const stats = Core.getQuestionStats(state.progress, question.id);
     const questionType = Core.getQuestionType(question);
     if (subject !== 'all' && question.category !== subject) return false;
@@ -1439,7 +1445,8 @@ function chooseNextQuestion() {{
 }}
 
 function showPreviousQuestion() {{
-  const restored = Core.takePreviousQuestion(questions, state.history);
+  const candidates = getFilteredQuestions();
+  const restored = Core.takePreviousQuestion(candidates, state.history);
   if (!restored.question) {{
     elements.feedback.textContent = '没有上一题。';
     elements.feedback.className = 'feedback bad';
@@ -1868,6 +1875,38 @@ function populatePracticeSeriesSelect() {{
   if (previousValue && getAllSeries().some((series) => series.name === previousValue)) {{
     elements.currentSeriesTarget.value = previousValue;
   }}
+  populatePracticeScopeSelect();
+}}
+
+function populatePracticeScopeSelect() {{
+  const previousValue = elements.scopeFilter.value;
+  elements.scopeFilter.innerHTML = `
+    <option value="all">全题库</option>
+    <option value="wrong">只刷错题</option>
+    <option value="favorite">只刷收藏</option>
+  `;
+  getAllSeries().forEach((series) => {{
+    const option = document.createElement('option');
+    const label = series.custom ? `自定义：${{series.title}}` : series.name;
+    option.value = getSeriesScopeValue(series.name);
+    option.textContent = `专题：${{label}}（${{series.questions.length}} 题）`;
+    elements.scopeFilter.appendChild(option);
+  }});
+  const values = [...elements.scopeFilter.options].map((option) => option.value);
+  elements.scopeFilter.value = values.includes(previousValue) ? previousValue : 'all';
+}}
+
+function getSeriesScopeValue(seriesName) {{
+  return `series:${{seriesName}}`;
+}}
+
+function getSeriesByScopeValue(scopeValue) {{
+  const seriesName = scopeValue.replace(/^series:/, '');
+  return getAllSeries().find((series) => series.name === seriesName) || null;
+}}
+
+function normalizePracticeQuestion(question) {{
+  return questions.find((item) => isSameSeriesQuestion(item, question)) || question;
 }}
 
 function getSelectedSeries() {{
