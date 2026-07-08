@@ -75,15 +75,41 @@ test('wrong book and favorites can add questions into a series review set', () =
 test('practice notes are locked until the current question is answered', () => {
   assert.match(html, /id="note-status"/);
   assert.match(html, /id="question-note"/);
+  assert.match(html, /id="question-note-box"/);
   assert.match(html, /questionNote: document\.getElementById\('question-note'\),/);
+  assert.match(html, /questionNoteBox: document\.getElementById\('question-note-box'\),/);
   assert.match(html, /noteStatus: document\.getElementById\('note-status'\),/);
   assert.match(html, /function renderQuestionNote\(\)/);
+  assert.match(html, /function revealQuestionNote\(\)/);
   assert.match(html, /function saveQuestionNote\(\)/);
   assert.match(html, /elements\.questionNote\.disabled = !state\.answered;/);
   assert.match(html, /elements\.questionNote\.value = state\.answered \? stats\.note \|\| '' : '';/);
+  assert.match(html, /elements\.questionNoteBox\.classList\.toggle\('note-revealed', state\.answered\);/);
+  assert.match(html, /if \(!state\.answered\) return;/);
+  assert.match(html, /elements\.questionNoteBox\.addEventListener\('dblclick', revealQuestionNote\);/);
   assert.match(html, /elements\.noteStatus\.textContent = state\.answered \? '可编辑当前题笔记。' : '提交答案后才能查看或修改笔记。';/);
   assert.match(html, /note: elements\.questionNote\.value,/);
   assert.match(html, /elements\.questionNote\.addEventListener\('input', saveQuestionNote\);/);
+});
+
+test('search view can find questions and add results into a series', () => {
+  assert.match(html, /data-view="search"[^>]*>搜题<\/button>/);
+  assert.match(html, /id="search-view"/);
+  assert.match(html, /id="question-search-query"/);
+  assert.match(html, /id="question-search-button"/);
+  assert.match(html, /id="question-search-results"/);
+  assert.match(html, /id="question-search-summary"/);
+  assert.match(html, /searchView: document\.getElementById\('search-view'\),/);
+  assert.match(html, /questionSearchQuery: document\.getElementById\('question-search-query'\),/);
+  assert.match(html, /questionSearchButton: document\.getElementById\('question-search-button'\),/);
+  assert.match(html, /questionSearchResults: document\.getElementById\('question-search-results'\),/);
+  assert.match(html, /questionSearchSummary: document\.getElementById\('question-search-summary'\),/);
+  assert.match(html, /function renderQuestionSearchResults\(results = state\.questionSearchResults\)/);
+  assert.match(html, /function runQuestionSearch\(\)/);
+  assert.match(html, /Core\.searchQuestionBank\(questions, elements\.questionSearchQuery\.value, 80\)/);
+  assert.match(html, /<div class="compact-options">\$\{renderQuestionOptionList\(question\)\}<\/div>/);
+  assert.match(html, /appendSeriesAddControls\(row, question\);/);
+  assert.match(html, /if \(isSearch\) renderQuestionSearchResults\(\);/);
 });
 
 test('progress import and export use a complete backup with merge support', () => {

@@ -472,6 +472,11 @@ def build_html() -> str:
       gap: 8px;
     }}
 
+    .note-box h2 {{
+      cursor: pointer;
+      user-select: none;
+    }}
+
     .note-box textarea {{
       width: 100%;
       min-height: 140px;
@@ -487,6 +492,14 @@ def build_html() -> str:
       color: var(--muted);
       background: rgba(248, 243, 231, 0.62);
       cursor: not-allowed;
+    }}
+
+    .note-box:not(.note-revealed) textarea {{
+      display: none;
+    }}
+
+    .note-box.note-revealed textarea {{
+      display: block;
     }}
 
     .meter {{
@@ -541,6 +554,15 @@ def build_html() -> str:
       display: grid;
       gap: 10px;
       padding: 16px;
+    }}
+
+    .search-controls {{
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) minmax(140px, 180px) minmax(140px, 180px) auto;
+      gap: 10px;
+      align-items: end;
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
     }}
 
     .list-actions {{
@@ -766,6 +788,7 @@ def build_html() -> str:
       .series-builder-grid,
       .series-builder-lists,
       .series-controls,
+      .search-controls,
       .wrong-filters {{
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }}
@@ -783,6 +806,7 @@ def build_html() -> str:
       .series-builder-grid,
       .series-builder-lists,
       .series-controls,
+      .search-controls,
       .wrong-filters,
       .storage-row {{
         grid-template-columns: 1fr;
@@ -818,6 +842,7 @@ def build_html() -> str:
       <button class="view-tab active" data-view="practice" type="button">刷题</button>
       <button class="view-tab" data-view="paper" type="button">组卷</button>
       <button class="view-tab" data-view="series" type="button">专题复习</button>
+      <button class="view-tab" data-view="search" type="button">搜题</button>
       <button class="view-tab" data-view="wrongBook" type="button">错题本</button>
       <button class="view-tab" data-view="favorite" type="button">收藏</button>
     </nav>
@@ -891,7 +916,7 @@ def build_html() -> str:
           <div class="meter" aria-hidden="true"><div id="current-weight-bar"></div></div>
         </section>
 
-        <section class="side-section note-box">
+        <section class="side-section note-box" id="question-note-box">
           <h2>笔记</h2>
           <p class="empty" id="note-status">提交答案后才能查看或修改笔记。</p>
           <textarea id="question-note" placeholder="提交答案后记录这道题的易错点。"></textarea>
@@ -912,6 +937,40 @@ def build_html() -> str:
           <p class="empty" id="storage-status">导出会包含进度、笔记、收藏和专题配置。</p>
         </section>
       </aside>
+    </section>
+
+    <section class="app-view wrong-book-view hidden" id="search-view" aria-label="搜题">
+      <header class="wrong-book-header">
+        <div>
+          <h2>搜题</h2>
+          <p id="question-search-summary">输入题干或选项关键词后搜索题库。</p>
+        </div>
+      </header>
+      <div class="search-controls">
+        <div class="field">
+          <label for="question-search-query">关键词</label>
+          <input id="question-search-query" type="search" placeholder="输入题干或选项关键词">
+        </div>
+        <div class="field">
+          <label for="question-search-subject">科目</label>
+          <select id="question-search-subject">
+            <option value="all">全部</option>
+            <option value="X">习概</option>
+            <option value="M">毛概</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="question-search-type">题型</label>
+          <select id="question-search-type">
+            <option value="all">全部</option>
+            <option value="single">单选</option>
+            <option value="multiple">多选</option>
+            <option value="truefalse">判断</option>
+          </select>
+        </div>
+        <button class="primary-button" id="question-search-button" type="button">搜索</button>
+      </div>
+      <div class="wrong-book-list" id="question-search-results"></div>
     </section>
 
     <section class="app-view wrong-book-view hidden" id="series-view" aria-label="专题复习">
@@ -1137,6 +1196,7 @@ const state = {{
   customSeries: loadCustomSeries(),
   seriesAdditions: loadSeriesAdditions(),
   customSeriesDraft: [],
+  questionSearchResults: [],
   wrongPage: 0,
   favoritePage: 0,
 }};
@@ -1146,6 +1206,7 @@ const elements = {{
   practiceView: document.getElementById('practice-view'),
   paperView: document.getElementById('paper-view'),
   seriesView: document.getElementById('series-view'),
+  searchView: document.getElementById('search-view'),
   wrongBookView: document.getElementById('wrong-book-view'),
   favoriteView: document.getElementById('favorite-view'),
   subjectFilter: document.getElementById('subject-filter'),
@@ -1178,6 +1239,12 @@ const elements = {{
   customSeriesSelectedList: document.getElementById('custom-series-selected-list'),
   saveCustomSeries: document.getElementById('save-custom-series'),
   customSeriesStatus: document.getElementById('custom-series-status'),
+  questionSearchQuery: document.getElementById('question-search-query'),
+  questionSearchSubject: document.getElementById('question-search-subject'),
+  questionSearchType: document.getElementById('question-search-type'),
+  questionSearchButton: document.getElementById('question-search-button'),
+  questionSearchResults: document.getElementById('question-search-results'),
+  questionSearchSummary: document.getElementById('question-search-summary'),
   wrongSubjectFilter: document.getElementById('wrong-subject-filter'),
   wrongTypeFilter: document.getElementById('wrong-type-filter'),
   startWrongReview: document.getElementById('start-wrong-review'),
@@ -1207,6 +1274,7 @@ const elements = {{
   feedback: document.getElementById('feedback'),
   currentStats: document.getElementById('current-stats'),
   currentWeightBar: document.getElementById('current-weight-bar'),
+  questionNoteBox: document.getElementById('question-note-box'),
   noteStatus: document.getElementById('note-status'),
   questionNote: document.getElementById('question-note'),
   todayCount: document.getElementById('today-count'),
@@ -1305,11 +1373,13 @@ function switchView(view) {{
   const isPractice = view === 'practice';
   const isPaper = view === 'paper';
   const isSeries = view === 'series';
+  const isSearch = view === 'search';
   const isWrongBook = view === 'wrongBook';
   const isFavorite = view === 'favorite';
   elements.practiceView.classList.toggle('hidden', !isPractice);
   elements.paperView.classList.toggle('hidden', !isPaper);
   elements.seriesView.classList.toggle('hidden', !isSeries);
+  elements.searchView.classList.toggle('hidden', !isSearch);
   elements.wrongBookView.classList.toggle('hidden', !isWrongBook);
   elements.favoriteView.classList.toggle('hidden', !isFavorite);
   elements.viewButtons.forEach((button) => {{
@@ -1317,6 +1387,7 @@ function switchView(view) {{
   }});
   if (isPaper) renderPaper();
   if (isSeries) renderSeriesQuestion();
+  if (isSearch) renderQuestionSearchResults();
   if (isWrongBook) renderWrongBook();
   if (isFavorite) renderFavoriteBook();
 }}
@@ -1384,6 +1455,7 @@ function renderEmptyState() {{
   elements.feedback.className = 'feedback';
   elements.currentStats.textContent = '当前筛选下没有可刷题目。';
   elements.currentWeightBar.style.width = '0%';
+  elements.questionNoteBox.classList.remove('note-revealed');
   elements.questionNote.value = '';
   elements.questionNote.disabled = true;
   elements.noteStatus.textContent = '提交答案后才能查看或修改笔记。';
@@ -1463,6 +1535,7 @@ function renderQuestionMeta() {{
 
 function renderQuestionNote() {{
   if (!state.current) {{
+    elements.questionNoteBox.classList.remove('note-revealed');
     elements.questionNote.value = '';
     elements.questionNote.disabled = true;
     elements.noteStatus.textContent = '提交答案后才能查看或修改笔记。';
@@ -1470,9 +1543,17 @@ function renderQuestionNote() {{
   }}
 
   const stats = Core.getQuestionStats(state.progress, state.current.id);
+  elements.questionNoteBox.classList.toggle('note-revealed', state.answered);
   elements.questionNote.disabled = !state.answered;
   elements.questionNote.value = state.answered ? stats.note || '' : '';
   elements.noteStatus.textContent = state.answered ? '可编辑当前题笔记。' : '提交答案后才能查看或修改笔记。';
+}}
+
+function revealQuestionNote() {{
+  if (!state.answered) return;
+  elements.questionNoteBox.classList.add('note-revealed');
+  elements.questionNote.focus();
+  elements.noteStatus.textContent = '已显示当前题笔记。';
 }}
 
 function toggleOption(key) {{
@@ -2147,6 +2228,64 @@ function renderListPager(totalItems, currentPage, statusElement, prevButton, nex
   nextButton.disabled = currentPage >= totalPages - 1 || totalItems === 0;
 }}
 
+function filterSearchResults(results) {{
+  const subject = elements.questionSearchSubject.value;
+  const type = elements.questionSearchType.value;
+  return results.filter((question) => {{
+    if (subject !== 'all' && question.category !== subject) return false;
+    if (type !== 'all' && Core.getQuestionType(question) !== type) return false;
+    return true;
+  }});
+}}
+
+function renderQuestionSearchResults(results = state.questionSearchResults) {{
+  const filteredResults = filterSearchResults(results);
+  elements.questionSearchResults.innerHTML = '';
+  if (!elements.questionSearchQuery.value.trim()) {{
+    elements.questionSearchSummary.textContent = '输入题干或选项关键词后搜索题库。';
+    elements.questionSearchResults.innerHTML = '<p class="empty">还没有搜索结果。</p>';
+    return;
+  }}
+
+  elements.questionSearchSummary.textContent = filteredResults.length
+    ? `找到 ${{filteredResults.length}} 道题，可直接加入专题。`
+    : '没有匹配的题目。';
+
+  if (!filteredResults.length) {{
+    elements.questionSearchResults.innerHTML = '<p class="empty">换一个关键词，或放宽科目和题型筛选。</p>';
+    return;
+  }}
+
+  filteredResults.forEach((question) => {{
+    const row = document.createElement('div');
+    row.className = 'wrong-item';
+    const stats = Core.getQuestionStats(state.progress, question.id);
+    const questionType = Core.getQuestionType(question);
+    row.innerHTML = `
+      <div class="wrong-item-meta">
+        <span class="pill subject">${{Core.getSubjectLabel(question.category)}}</span>
+        <span class="pill type-badge">${{Core.getQuestionTypeLabel(questionType)}}</span>
+        <span class="pill">错误 ${{stats.wrongCount}} 次</span>
+        <span class="pill">${{stats.favorite ? '已收藏' : '未收藏'}}</span>
+      </div>
+      <p>${{question.question}}</p>
+      <div class="compact-options">${{renderQuestionOptionList(question)}}</div>
+    `;
+    const practiceButton = document.createElement('button');
+    practiceButton.type = 'button';
+    practiceButton.textContent = '练这题';
+    practiceButton.addEventListener('click', () => openQuestionFromList(question));
+    row.appendChild(practiceButton);
+    appendSeriesAddControls(row, question);
+    elements.questionSearchResults.appendChild(row);
+  }});
+}}
+
+function runQuestionSearch() {{
+  state.questionSearchResults = Core.searchQuestionBank(questions, elements.questionSearchQuery.value, 80);
+  renderQuestionSearchResults();
+}}
+
 function appendSeriesAddControls(row, question) {{
   const wrap = document.createElement('div');
   wrap.className = 'series-add-row';
@@ -2552,6 +2691,12 @@ elements.seriesSearchQuery.addEventListener('keydown', (event) => {{
   if (event.key === 'Enter') searchSeriesQuestions();
 }});
 elements.saveCustomSeries.addEventListener('click', saveCustomSeriesDraft);
+elements.questionSearchButton.addEventListener('click', runQuestionSearch);
+elements.questionSearchQuery.addEventListener('keydown', (event) => {{
+  if (event.key === 'Enter') runQuestionSearch();
+}});
+elements.questionSearchSubject.addEventListener('change', () => renderQuestionSearchResults());
+elements.questionSearchType.addEventListener('change', () => renderQuestionSearchResults());
 elements.wrongSubjectFilter.addEventListener('change', () => {{
   state.wrongPage = 0;
   renderWrongBook();
@@ -2595,6 +2740,7 @@ elements.skipQuestion.addEventListener('click', chooseNextQuestion);
 elements.favoriteCurrent.addEventListener('click', toggleFavorite);
 elements.markMastered.addEventListener('click', toggleMastered);
 elements.questionNote.addEventListener('input', saveQuestionNote);
+elements.questionNoteBox.addEventListener('dblclick', revealQuestionNote);
 elements.addCurrentToSeries.addEventListener('click', () => {{
   if (!state.current) return;
   const added = addQuestionToSeries(state.current, elements.currentSeriesTarget.value);
