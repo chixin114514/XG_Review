@@ -54,6 +54,24 @@ test('wrong book and favorites show options, paginate, and support direct review
   assert.match(html, /button\.className = 'danger-button';[\s\S]*?button\.textContent = '取消收藏';/);
 });
 
+test('wrong book and favorites can add questions into a series review set', () => {
+  assert.match(html, /const SERIES_ADDITIONS_KEY = 'xi-mao-review-series-additions-v1';/);
+  assert.match(html, /id="current-series-target"/);
+  assert.match(html, /id="add-current-to-series"/);
+  assert.match(html, /function loadSeriesAdditions\(\)/);
+  assert.match(html, /function saveSeriesAdditions\(\)/);
+  assert.match(html, /function populatePracticeSeriesSelect\(\)/);
+  assert.match(html, /function getSeriesTargetOptions\(\)/);
+  assert.match(html, /function cloneQuestionForSeries\(question, seriesName, index\)/);
+  assert.match(html, /function addQuestionToSeries\(question, seriesName\)/);
+  assert.match(html, /class="series-target"/);
+  assert.match(html, /button\.textContent = '加入专题';/);
+  assert.match(html, /elements\.addCurrentToSeries\.addEventListener\('click'/);
+  assert.match(html, /state\.seriesAdditions/);
+  assert.match(html, /questions: \[\.\.\.series\.questions, \.\.\.additions\]/);
+  assert.match(html, /saveCustomSeries\(\);[\s\S]*?saveSeriesAdditions\(\);/);
+});
+
 test('question bank is loaded from sibling files instead of embedded in index', () => {
   assert.doesNotMatch(html, /id="question-data"/);
   assert.doesNotMatch(html, /<script type="application\/json"/);

@@ -343,6 +343,14 @@
       margin-top: 18px;
     }
 
+    .actions select {
+      min-height: 40px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      background: var(--paper-strong);
+      color: var(--ink);
+    }
+
     .feedback {
       min-height: 34px;
       margin-top: 14px;
@@ -595,6 +603,22 @@
       color: var(--wrong);
     }
 
+    .series-add-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .series-add-row select {
+      min-height: 30px;
+      padding: 5px 8px;
+      border: 1px solid var(--line);
+      background: #fffaf0;
+      color: var(--ink);
+      font-size: 13px;
+    }
+
     .wrong-item-meta {
       display: flex;
       flex-wrap: wrap;
@@ -742,6 +766,8 @@
             <button class="ghost-button" id="previous-question" type="button">上一题</button>
             <button class="ghost-button" id="skip-question" type="button">跳过</button>
             <button class="ghost-button" id="mark-mastered" type="button">标记掌握</button>
+            <select id="current-series-target" aria-label="选择专题系列"></select>
+            <button class="ghost-button" id="add-current-to-series" type="button">加入专题</button>
           </div>
           <div class="feedback" id="feedback"></div>
         </div>
@@ -1191,6 +1217,7 @@ function updateProgressAfterAnswer(progress, questionId, wasCorrect, now = new D
 const STORAGE_KEY = 'xi-mao-review-progress-v1';
 const TODAY_KEY = 'xi-mao-review-today-v1';
 const CUSTOM_SERIES_KEY = 'xi-mao-review-custom-series-v1';
+const SERIES_ADDITIONS_KEY = 'xi-mao-review-series-additions-v1';
 const LIST_PAGE_SIZE = 20;
 const questions = (window.QUESTION_BANK || []).map((question, index) => ({
   ...question,
@@ -1225,6 +1252,7 @@ const state = {
   seriesAnswered: false,
   seriesDisplayCorrectAnswer: [],
   customSeries: loadCustomSeries(),
+  seriesAdditions: loadSeriesAdditions(),
   customSeriesDraft: [],
   wrongPage: 0,
   favoritePage: 0,
@@ -1291,6 +1319,8 @@ const elements = {
   previousQuestion: document.getElementById('previous-question'),
   skipQuestion: document.getElementById('skip-question'),
   markMastered: document.getElementById('mark-mastered'),
+  currentSeriesTarget: document.getElementById('current-series-target'),
+  addCurrentToSeries: document.getElementById('add-current-to-series'),
   feedback: document.getElementById('feedback'),
   currentStats: document.getElementById('current-stats'),
   currentWeightBar: document.getElementById('current-weight-bar'),
@@ -1359,6 +1389,29 @@ function loadCustomSeries() {
 
 function saveCustomSeries() {
   localStorage.setItem(CUSTOM_SERIES_KEY, JSON.stringify(state.customSeries));
+}
+
+function loadSeriesAdditions() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SERIES_ADDITIONS_KEY)) || {};
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+    return Object.fromEntries(
+      Object.entries(raw)
+        .filter(([, questionsForSeries]) => Array.isArray(questionsForSeries))
+        .map(([seriesName, questionsForSeries]) => [
+          seriesName,
+          questionsForSeries
+            .filter((question) => question && question.question && question.options)
+            .map((question, questionIndex) => cloneQuestionForSeries(question, seriesName, questionIndex)),
+        ])
+    );
+  } catch {
+    return {};
+  }
+}
+
+function saveSeriesAdditions() {
+  localStorage.setItem(SERIES_ADDITIONS_KEY, JSON.stringify(state.seriesAdditions));
 }
 
 function switchView(view) {
@@ -1449,6 +1502,7 @@ function renderEmptyState() {
   elements.previousQuestion.disabled = state.history.length === 0;
   elements.favoriteCurrent.disabled = true;
   elements.markMastered.disabled = true;
+  elements.addCurrentToSeries.disabled = true;
   renderGlobalStats();
   renderWrongBook();
   renderFavoriteBook();
@@ -1463,6 +1517,7 @@ function renderQuestion() {
   elements.submitAnswer.disabled = false;
   elements.favoriteCurrent.disabled = false;
   elements.markMastered.disabled = false;
+  elements.addCurrentToSeries.disabled = false;
   elements.questionText.textContent = question.question;
   elements.options.innerHTML = '';
   renderQuestionMeta();
@@ -1792,12 +1847,93 @@ function populateSeriesSelect() {
   }
 }
 
+function populatePracticeSeriesSelect() {
+  const previousValue = elements.currentSeriesTarget.value;
+  elements.currentSeriesTarget.innerHTML = getSeriesTargetOptions();
+  if (previousValue && getAllSeries().some((series) => series.name === previousValue)) {
+    elements.currentSeriesTarget.value = previousValue;
+  }
+}
+
 function getSelectedSeries() {
   return getAllSeries().find((series) => series.name === elements.seriesSelect.value) || null;
 }
 
 function getAllSeries() {
-  return [...seriesBank, ...state.customSeries];
+  const builtInSeries = seriesBank.map((series) => {
+    const additions = state.seriesAdditions[series.name] || [];
+    return {
+      ...series,
+      questions: [...series.questions, ...additions],
+    };
+  });
+
+  return [
+    ...builtInSeries,
+    ...state.customSeries.map((series) => {
+      const additions = state.seriesAdditions[series.name] || [];
+      return {
+        ...series,
+        questions: [...series.questions, ...additions],
+      };
+    }),
+  ];
+}
+
+function cloneQuestionForSeries(question, seriesName, index) {
+  return {
+    category: question.category,
+    question: question.question,
+    options: question.options,
+    correct_answer: question.correct_answer || [],
+    id: `${seriesName}-added-${index}`,
+  };
+}
+
+function getSeriesTargetOptions() {
+  return getAllSeries()
+    .map((series) => {
+      const label = series.custom ? `自定义：${series.title}` : series.name;
+      return `<option value="${series.name}">${label}</option>`;
+    })
+    .join('');
+}
+
+function isSameSeriesQuestion(left, right) {
+  return left.category === right.category && left.question === right.question;
+}
+
+function addQuestionToSeries(question, seriesName) {
+  if (!question || !seriesName) return false;
+  const currentSeries = getAllSeries().find((series) => series.name === seriesName);
+  if (!currentSeries || currentSeries.questions.some((item) => isSameSeriesQuestion(item, question))) {
+    return false;
+  }
+
+  const customIndex = state.customSeries.findIndex((series) => series.name === seriesName);
+  if (customIndex >= 0) {
+    const target = state.customSeries[customIndex];
+    const nextQuestion = cloneQuestionForSeries(question, seriesName, target.questions.length);
+    state.customSeries = state.customSeries.map((series, index) => index === customIndex
+      ? { ...series, questions: [...series.questions, nextQuestion] }
+      : series);
+  } else {
+    const additions = state.seriesAdditions[seriesName] || [];
+    state.seriesAdditions = {
+      ...state.seriesAdditions,
+      [seriesName]: [
+        ...additions,
+        cloneQuestionForSeries(question, seriesName, currentSeries.questions.length),
+      ],
+    };
+  }
+
+  saveCustomSeries();
+  saveSeriesAdditions();
+  populateSeriesSelect();
+  populatePracticeSeriesSelect();
+  renderSeriesQuestion();
+  return true;
 }
 
 function renderQuestionOptionList(question) {
@@ -1926,6 +2062,7 @@ function saveCustomSeriesDraft() {
   elements.customSeriesName.value = '';
   saveCustomSeries();
   populateSeriesSelect();
+  populatePracticeSeriesSelect();
   elements.seriesSelect.value = name;
   state.seriesCurrent = null;
   state.seriesQuestions = [];
@@ -2090,6 +2227,26 @@ function renderListPager(totalItems, currentPage, statusElement, prevButton, nex
   nextButton.disabled = currentPage >= totalPages - 1 || totalItems === 0;
 }
 
+function appendSeriesAddControls(row, question) {
+  const wrap = document.createElement('div');
+  wrap.className = 'series-add-row';
+  wrap.innerHTML = `
+    <select class="series-target" aria-label="选择专题系列">
+      ${getSeriesTargetOptions()}
+    </select>
+  `;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = '加入专题';
+  button.addEventListener('click', () => {
+    const seriesName = wrap.querySelector('.series-target').value;
+    const added = addQuestionToSeries(question, seriesName);
+    button.textContent = added ? '已加入' : '已存在';
+  });
+  wrap.appendChild(button);
+  row.appendChild(wrap);
+}
+
 function renderWrongBook() {
   const subject = elements.wrongSubjectFilter.value;
   const type = elements.wrongTypeFilter.value;
@@ -2143,6 +2300,7 @@ function renderWrongBook() {
     practiceButton.textContent = '练这题';
     practiceButton.addEventListener('click', () => openQuestionFromList(item.question));
     row.appendChild(practiceButton);
+    appendSeriesAddControls(row, item.question);
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'danger-button';
@@ -2206,6 +2364,7 @@ function renderFavoriteBook() {
     practiceButton.textContent = '练这题';
     practiceButton.addEventListener('click', () => openQuestionFromList(item.question));
     row.appendChild(practiceButton);
+    appendSeriesAddControls(row, item.question);
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'danger-button';
@@ -2418,6 +2577,12 @@ elements.previousQuestion.addEventListener('click', showPreviousQuestion);
 elements.skipQuestion.addEventListener('click', chooseNextQuestion);
 elements.favoriteCurrent.addEventListener('click', toggleFavorite);
 elements.markMastered.addEventListener('click', toggleMastered);
+elements.addCurrentToSeries.addEventListener('click', () => {
+  if (!state.current) return;
+  const added = addQuestionToSeries(state.current, elements.currentSeriesTarget.value);
+  elements.feedback.textContent = added ? '已加入专题复习系列。' : '这道题已在该系列中。';
+  elements.feedback.className = `feedback ${added ? 'good' : 'bad'}`;
+});
 elements.exportProgress.addEventListener('click', exportProgress);
 elements.importProgressButton.addEventListener('click', () => elements.importProgress.click());
 elements.importProgress.addEventListener('change', (event) => {
@@ -2428,6 +2593,7 @@ elements.importProgress.addEventListener('change', (event) => {
 elements.resetProgress.addEventListener('click', resetProgress);
 
 populateSeriesSelect();
+populatePracticeSeriesSelect();
 renderCustomSeriesDraft();
 chooseNextQuestion();
 </script>
