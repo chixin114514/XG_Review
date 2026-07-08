@@ -72,6 +72,20 @@ test('wrong book and favorites can add questions into a series review set', () =
   assert.match(html, /saveCustomSeries\(\);[\s\S]*?saveSeriesAdditions\(\);/);
 });
 
+test('practice notes are locked until the current question is answered', () => {
+  assert.match(html, /id="note-status"/);
+  assert.match(html, /id="question-note"/);
+  assert.match(html, /questionNote: document\.getElementById\('question-note'\),/);
+  assert.match(html, /noteStatus: document\.getElementById\('note-status'\),/);
+  assert.match(html, /function renderQuestionNote\(\)/);
+  assert.match(html, /function saveQuestionNote\(\)/);
+  assert.match(html, /elements\.questionNote\.disabled = !state\.answered;/);
+  assert.match(html, /elements\.questionNote\.value = state\.answered \? stats\.note \|\| '' : '';/);
+  assert.match(html, /elements\.noteStatus\.textContent = state\.answered \? '可编辑当前题笔记。' : '提交答案后才能查看或修改笔记。';/);
+  assert.match(html, /note: elements\.questionNote\.value,/);
+  assert.match(html, /elements\.questionNote\.addEventListener\('input', saveQuestionNote\);/);
+});
+
 test('question bank is loaded from sibling files instead of embedded in index', () => {
   assert.doesNotMatch(html, /id="question-data"/);
   assert.doesNotMatch(html, /<script type="application\/json"/);

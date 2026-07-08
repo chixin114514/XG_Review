@@ -467,6 +467,28 @@ def build_html() -> str:
       line-height: 1.2;
     }}
 
+    .note-box {{
+      display: grid;
+      gap: 8px;
+    }}
+
+    .note-box textarea {{
+      width: 100%;
+      min-height: 140px;
+      resize: vertical;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      background: var(--paper-strong);
+      color: var(--ink);
+      line-height: 1.55;
+    }}
+
+    .note-box textarea:disabled {{
+      color: var(--muted);
+      background: rgba(248, 243, 231, 0.62);
+      cursor: not-allowed;
+    }}
+
     .meter {{
       height: 12px;
       overflow: hidden;
@@ -860,6 +882,12 @@ def build_html() -> str:
           <div class="meter" aria-hidden="true"><div id="current-weight-bar"></div></div>
         </section>
 
+        <section class="side-section note-box">
+          <h2>笔记</h2>
+          <p class="empty" id="note-status">提交答案后才能查看或修改笔记。</p>
+          <textarea id="question-note" placeholder="提交答案后记录这道题的易错点。"></textarea>
+        </section>
+
         <section class="side-section">
           <h2>进度</h2>
           <div class="storage-row">
@@ -1165,6 +1193,8 @@ const elements = {{
   feedback: document.getElementById('feedback'),
   currentStats: document.getElementById('current-stats'),
   currentWeightBar: document.getElementById('current-weight-bar'),
+  noteStatus: document.getElementById('note-status'),
+  questionNote: document.getElementById('question-note'),
   todayCount: document.getElementById('today-count'),
   accuracy: document.getElementById('accuracy'),
   wrongTotal: document.getElementById('wrong-total'),
@@ -1338,6 +1368,9 @@ function renderEmptyState() {{
   elements.feedback.className = 'feedback';
   elements.currentStats.textContent = '当前筛选下没有可刷题目。';
   elements.currentWeightBar.style.width = '0%';
+  elements.questionNote.value = '';
+  elements.questionNote.disabled = true;
+  elements.noteStatus.textContent = '提交答案后才能查看或修改笔记。';
   elements.submitAnswer.disabled = true;
   elements.submitAnswer.textContent = '提交';
   elements.previousQuestion.disabled = state.history.length === 0;
@@ -1377,6 +1410,7 @@ function renderQuestion() {{
 
   elements.feedback.textContent = type === 'multiple' ? '多选题需要选全，少选或多选都算错。' : '';
   elements.feedback.className = 'feedback';
+  renderQuestionNote();
   renderCurrentStats();
   renderGlobalStats();
   renderWrongBook();
@@ -1409,6 +1443,20 @@ function renderQuestionMeta() {{
     `<span class="pill">错误 ${{stats.wrongCount}} 次</span>`,
     `<span class="pill">${{weightLabel}}</span>`,
   ].join('');
+}}
+
+function renderQuestionNote() {{
+  if (!state.current) {{
+    elements.questionNote.value = '';
+    elements.questionNote.disabled = true;
+    elements.noteStatus.textContent = '提交答案后才能查看或修改笔记。';
+    return;
+  }}
+
+  const stats = Core.getQuestionStats(state.progress, state.current.id);
+  elements.questionNote.disabled = !state.answered;
+  elements.questionNote.value = state.answered ? stats.note || '' : '';
+  elements.noteStatus.textContent = state.answered ? '可编辑当前题笔记。' : '提交答案后才能查看或修改笔记。';
 }}
 
 function toggleOption(key) {{
@@ -1478,6 +1526,7 @@ function submitAnswer() {{
   }}
 
   renderQuestionMeta();
+  renderQuestionNote();
   renderCurrentStats();
   renderGlobalStats();
   renderWrongBook();
@@ -1490,6 +1539,20 @@ function renderCurrentStats() {{
   const weight = Core.getQuestionWeight(stats);
   elements.currentStats.textContent = `已做 ${{stats.seenCount}} 次，答错 ${{stats.wrongCount}} 次，连续答对 ${{stats.streak}} 次。`;
   elements.currentWeightBar.style.width = `${{Math.min(100, Math.round((weight / 11) * 100))}}%`;
+}}
+
+function saveQuestionNote() {{
+  if (!state.current || !state.answered) return;
+  const id = String(state.current.id);
+  const stats = Core.getQuestionStats(state.progress, id);
+  state.progress = {{
+    ...state.progress,
+    [id]: {{
+      ...stats,
+      note: elements.questionNote.value,
+    }},
+  }};
+  saveProgress();
 }}
 
 function renderGlobalStats() {{
@@ -2418,6 +2481,7 @@ elements.previousQuestion.addEventListener('click', showPreviousQuestion);
 elements.skipQuestion.addEventListener('click', chooseNextQuestion);
 elements.favoriteCurrent.addEventListener('click', toggleFavorite);
 elements.markMastered.addEventListener('click', toggleMastered);
+elements.questionNote.addEventListener('input', saveQuestionNote);
 elements.addCurrentToSeries.addEventListener('click', () => {{
   if (!state.current) return;
   const added = addQuestionToSeries(state.current, elements.currentSeriesTarget.value);
