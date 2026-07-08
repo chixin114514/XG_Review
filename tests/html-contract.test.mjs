@@ -83,11 +83,15 @@ test('practice notes are locked until the current question is answered', () => {
   assert.match(html, /function revealQuestionNote\(\)/);
   assert.match(html, /function saveQuestionNote\(\)/);
   assert.match(html, /elements\.questionNote\.disabled = !state\.answered;/);
-  assert.match(html, /elements\.questionNote\.value = state\.answered \? stats\.note \|\| '' : '';/);
-  assert.match(html, /elements\.questionNoteBox\.classList\.toggle\('note-revealed', state\.answered\);/);
+  assert.match(html, /noteRevealed: false,/);
+  assert.match(html, /state\.noteRevealed = false;/);
+  assert.match(html, /state\.noteRevealed = true;/);
+  assert.match(html, /elements\.questionNote\.value = state\.answered && state\.noteRevealed \? stats\.note \|\| '' : '';/);
+  assert.match(html, /elements\.questionNoteBox\.classList\.toggle\('note-revealed', state\.answered && state\.noteRevealed\);/);
+  assert.doesNotMatch(html, /elements\.questionNoteBox\.classList\.toggle\('note-revealed', state\.answered\);/);
   assert.match(html, /if \(!state\.answered\) return;/);
   assert.match(html, /elements\.questionNoteBox\.addEventListener\('dblclick', revealQuestionNote\);/);
-  assert.match(html, /elements\.noteStatus\.textContent = state\.answered \? '可编辑当前题笔记。' : '提交答案后才能查看或修改笔记。';/);
+  assert.match(html, /双击“笔记”标题或本卡片空白处查看和修改笔记。/);
   assert.match(html, /note: elements\.questionNote\.value,/);
   assert.match(html, /elements\.questionNote\.addEventListener\('input', saveQuestionNote\);/);
 });

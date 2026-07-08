@@ -1185,6 +1185,7 @@ const state = {{
   selected: new Set(),
   displayCorrectAnswer: [],
   answered: false,
+  noteRevealed: false,
   paperQuestions: [],
   paperSelections: {{}},
   paperSubmitted: false,
@@ -1428,6 +1429,7 @@ function chooseNextQuestion() {{
   state.selected = new Set();
   state.displayCorrectAnswer = [];
   state.answered = false;
+  state.noteRevealed = false;
   renderQuestion();
 }}
 
@@ -1444,6 +1446,7 @@ function showPreviousQuestion() {{
   state.selected = new Set();
   state.displayCorrectAnswer = [];
   state.answered = false;
+  state.noteRevealed = false;
   renderQuestion();
 }}
 
@@ -1455,6 +1458,7 @@ function renderEmptyState() {{
   elements.feedback.className = 'feedback';
   elements.currentStats.textContent = '当前筛选下没有可刷题目。';
   elements.currentWeightBar.style.width = '0%';
+  state.noteRevealed = false;
   elements.questionNoteBox.classList.remove('note-revealed');
   elements.questionNote.value = '';
   elements.questionNote.disabled = true;
@@ -1535,6 +1539,7 @@ function renderQuestionMeta() {{
 
 function renderQuestionNote() {{
   if (!state.current) {{
+    state.noteRevealed = false;
     elements.questionNoteBox.classList.remove('note-revealed');
     elements.questionNote.value = '';
     elements.questionNote.disabled = true;
@@ -1543,15 +1548,18 @@ function renderQuestionNote() {{
   }}
 
   const stats = Core.getQuestionStats(state.progress, state.current.id);
-  elements.questionNoteBox.classList.toggle('note-revealed', state.answered);
+  elements.questionNoteBox.classList.toggle('note-revealed', state.answered && state.noteRevealed);
   elements.questionNote.disabled = !state.answered;
-  elements.questionNote.value = state.answered ? stats.note || '' : '';
-  elements.noteStatus.textContent = state.answered ? '可编辑当前题笔记。' : '提交答案后才能查看或修改笔记。';
+  elements.questionNote.value = state.answered && state.noteRevealed ? stats.note || '' : '';
+  elements.noteStatus.textContent = state.answered
+    ? '双击“笔记”标题或本卡片空白处查看和修改笔记。'
+    : '提交答案后才能查看或修改笔记。';
 }}
 
 function revealQuestionNote() {{
   if (!state.answered) return;
-  elements.questionNoteBox.classList.add('note-revealed');
+  state.noteRevealed = true;
+  renderQuestionNote();
   elements.questionNote.focus();
   elements.noteStatus.textContent = '已显示当前题笔记。';
 }}
@@ -1639,7 +1647,7 @@ function renderCurrentStats() {{
 }}
 
 function saveQuestionNote() {{
-  if (!state.current || !state.answered) return;
+  if (!state.current || !state.answered || !state.noteRevealed) return;
   const id = String(state.current.id);
   const stats = Core.getQuestionStats(state.progress, id);
   state.progress = {{
